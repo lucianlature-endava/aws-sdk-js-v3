@@ -1,0 +1,11 @@
+# DynamoDB Local — http://localhost:8000
+# From this directory: docker compose up -d
+# Stop: docker compose down
+
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: dynamodb-local
+    ports:
+      - "8000:8000"
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]

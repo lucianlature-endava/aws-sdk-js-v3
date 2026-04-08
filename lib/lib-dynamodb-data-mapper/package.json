@@ -1,0 +1,71 @@
+{
+  "name": "@aws-sdk/lib-dynamodb-data-mapper",
+  "version": "3.1005.0",
+  "description": "Typed table mapping helpers for Amazon DynamoDB on top of DynamoDBDocumentClient.",
+  "main": "./dist-cjs/index.js",
+  "module": "./dist-es/index.js",
+  "types": "./dist-types/index.d.ts",
+  "scripts": {
+    "build": "concurrently 'yarn:build:types' 'yarn:build:es' && yarn build:cjs",
+    "build:cjs": "node ../../scripts/compilation/inline lib-dynamodb-data-mapper",
+    "build:es": "tsc -p tsconfig.es.json",
+    "build:include:deps": "yarn g:turbo run build -F=\"$npm_package_name\"",
+    "build:types": "tsc -p tsconfig.types.json",
+    "build:types:downlevel": "downlevel-dts dist-types dist-types/ts3.4",
+    "clean": "premove dist-cjs dist-es dist-types tsconfig.cjs.tsbuildinfo tsconfig.es.tsbuildinfo tsconfig.types.tsbuildinfo",
+    "extract:docs": "api-extractor run --local",
+    "test": "yarn g:vitest run",
+    "test:watch": "yarn g:vitest watch",
+    "sample:demo": "tsx samples/demo.ts",
+    "sample:seed": "tsx samples/seed.ts",
+    "sample:inspect-local": "tsx samples/inspect-local.ts",
+    "sample:bench": "tsx samples/micro-bench.ts",
+    "test:e2e": "yarn g:vitest run -c vitest.config.e2e.mts --mode development",
+    "test:e2e:watch": "yarn g:vitest watch -c vitest.config.e2e.mts",
+    "test:integration": "yarn g:vitest run -c vitest.config.integ.mts --mode development",
+    "test:integration:watch": "yarn g:vitest watch -c vitest.config.integ.mts"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": {
+    "name": "AWS SDK for JavaScript Team",
+    "url": "https://aws.amazon.com/javascript/"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "tslib": "^2.6.2"
+  },
+  "peerDependencies": {
+    "@aws-sdk/client-dynamodb": "workspace:^3.1005.0",
+    "@aws-sdk/lib-dynamodb": "workspace:^3.1005.0"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "workspace:3.1005.0",
+    "@aws-sdk/lib-dynamodb": "workspace:3.1005.0",
+    "@tsconfig/recommended": "1.0.1",
+    "@types/node": "^20.14.8",
+    "concurrently": "7.0.0",
+    "downlevel-dts": "0.10.1",
+    "premove": "4.0.0",
+    "tinybench": "^6.0.0",
+    "tsx": "4.19.2",
+    "typescript": "~5.8.3"
+  },
+  "typesVersions": {
+    "<4.5": {
+      "dist-types/*": [
+        "dist-types/ts3.4/*"
+      ]
+    }
+  },
+  "files": [
+    "dist-*/**"
+  ],
+  "homepage": "https://github.com/aws/aws-sdk-js-v3/tree/main/lib/lib-dynamodb-data-mapper",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aws/aws-sdk-js-v3.git",
+    "directory": "lib/lib-dynamodb-data-mapper"
+  }
+}
