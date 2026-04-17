@@ -5,7 +5,8 @@
 services:
   dynamodb-local:
     image: amazon/dynamodb-local:latest
-    container_name: dynamodb-local
+    # No fixed container_name — avoids "already in use" when another project
+    # or an old compose run left a container named dynamodb-local on the host.
     ports:
       - "8000:8000"
     command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
