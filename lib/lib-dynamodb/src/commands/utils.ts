@@ -1,5 +1,13 @@
 import { marshall, marshallOptions, unmarshall, unmarshallOptions } from "@aws-sdk/util-dynamodb";
 
+const __perfUnmarshall = (ms: number) => {
+  if (process.env.AWS_SDK_PERF_RESPONSE_SLICES !== "1") return;
+  const k = "__AWS_SDK_RESPONSE_PERF_SLICES__";
+  const g = globalThis as unknown as Record<string, Record<string, number>>;
+  if (!g[k]) g[k] = {};
+  g[k].document_unmarshall_ms = Number(ms.toFixed(3));
+};
+
 /**
  * @internal
  */
@@ -116,5 +124,11 @@ export const marshallInput = (obj: any, keyNodes: KeyNodeChildren, options?: mar
  */
 export const unmarshallOutput = (obj: any, keyNodes: KeyNodeChildren, options?: unmarshallOptions) => {
   const unmarshallFunc = (toMarshall: any) => unmarshall(toMarshall, options);
+  if (process.env.AWS_SDK_PERF_RESPONSE_SLICES === "1") {
+    const t0 = performance.now();
+    const out = processKeysInObj(obj, unmarshallFunc, keyNodes);
+    __perfUnmarshall(performance.now() - t0);
+    return out;
+  }
   return processKeysInObj(obj, unmarshallFunc, keyNodes);
 };

@@ -1,0 +1,109 @@
+  Sampling 1/25: v3 doc: put                                                       Sampling 2/25: mapper v3: put                                                    Sampling 3/25: toolbox: put                                                      Sampling 4/25: electrodb: put                                                    Sampling 5/25: dynamoose: put                                                    Sampling 6/25: v3 doc: get                                                       Sampling 7/25: mapper v3: get                                                    Sampling 8/25: toolbox: get                                                      Sampling 9/25: electrodb: get                                                    Sampling 10/25: dynamoose: get                                                    Sampling 11/25: v3 doc: update                                                    Sampling 12/25: mapper v3: update                                                 Sampling 13/25: toolbox: update                                                   Sampling 14/25: electrodb: update                                                 Sampling 15/25: dynamoose: update                                                 Sampling 16/25: v3 doc: query                                                     Sampling 17/25: mapper v3: query                                                  Sampling 18/25: toolbox: query                                                    Sampling 19/25: electrodb: query                                                  Sampling 20/25: dynamoose: query                                                  Sampling 21/25: v3 doc: delete                                                    Sampling 22/25: mapper v3: delete                                                 Sampling 23/25: toolbox: delete                                                   Sampling 24/25: electrodb: delete                                                 Sampling 25/25: dynamoose: delete                                                                                                                               
+═══════════════════════════════════════════════════════════════════
+  DynamoDB stack comparison — measure-only (no I/O, sequential per-call) (same keys as micro-bench.ts)
+═══════════════════════════════════════════════════════════════════
+
+
+  Per-task results (sequential 400ms warmup, 2500ms measure; batch-p90 chunks of 25)
+┌───────────────────┬──────────┬───────────┬────────────────────────┬───────────┬─────────┬─────────┐
+│ Task name         │ p50 (ns) │ p90 (ns)  │ median(batch p90) (ns) │ mean (ns) │ samples │ batches │
+├───────────────────┼──────────┼───────────┼────────────────────────┼───────────┼─────────┼─────────┤
+│ v3 doc: put       │ 90,417   │ 132,445   │ 106,808                │ 108,993   │ 22864   │ 914     │
+│ mapper v3: put    │ 88,083   │ 117,208   │ 102,709                │ 106,197   │ 23467   │ 938     │
+│ toolbox: put      │ 96,708   │ 152,042   │ 135,712                │ 121,503   │ 20514   │ 820     │
+│ electrodb: put    │ 126,250  │ 181,250   │ 169,075                │ 147,748   │ 16895   │ 675     │
+│ dynamoose: put    │ 357,584  │ 626,734   │ 555,533                │ 430,724   │ 5800    │ 232     │
+│ v3 doc: get       │ 95,209   │ 178,417   │ 145,692                │ 156,824   │ 15918   │ 636     │
+│ mapper v3: get    │ 98,417   │ 195,492   │ 165,325                │ 141,990   │ 17575   │ 703     │
+│ toolbox: get      │ 115,208  │ 320,742   │ 200,133                │ 230,431   │ 10832   │ 433     │
+│ electrodb: get    │ 126,375  │ 201,167   │ 183,692                │ 157,522   │ 15847   │ 633     │
+│ dynamoose: get    │ 376,459  │ 708,225   │ 602,083                │ 473,293   │ 5279    │ 211     │
+│ v3 doc: update    │ 106,291  │ 249,192   │ 174,484                │ 190,037   │ 13135   │ 525     │
+│ mapper v3: update │ 115,458  │ 303,334   │ 204,308                │ 211,233   │ 11816   │ 472     │
+│ toolbox: update   │ 135,166  │ 370,920   │ 247,008                │ 230,573   │ 10822   │ 432     │
+│ electrodb: update │ 162,959  │ 345,841   │ 238,075                │ 257,456   │ 9699    │ 387     │
+│ dynamoose: update │ 544,334  │ 897,791   │ 825,121                │ 621,366   │ 4021    │ 160     │
+│ v3 doc: query     │ 94,750   │ 139,708   │ 128,234                │ 111,787   │ 22332   │ 893     │
+│ mapper v3: query  │ 95,375   │ 139,375   │ 128,091                │ 112,728   │ 22142   │ 885     │
+│ toolbox: query    │ 115,583  │ 218,625   │ 178,850                │ 174,211   │ 14331   │ 573     │
+│ electrodb: query  │ 137,625  │ 284,759   │ 210,300                │ 218,031   │ 11447   │ 457     │
+│ dynamoose: query  │ 527,542  │ 1,090,917 │ 833,475                │ 740,551   │ 3371    │ 134     │
+│ v3 doc: delete    │ 90,125   │ 158,791   │ 138,883                │ 124,208   │ 20097   │ 803     │
+│ mapper v3: delete │ 89,833   │ 156,542   │ 132,158                │ 121,901   │ 20475   │ 819     │
+│ toolbox: delete   │ 93,917   │ 153,554   │ 135,229                │ 120,846   │ 20658   │ 826     │
+│ electrodb: delete │ 128,583  │ 223,975   │ 187,592                │ 175,522   │ 14229   │ 569     │
+│ dynamoose: delete │ 258,854  │ 424,604   │ 361,775                │ 308,452   │ 8096    │ 323     │
+└───────────────────┴──────────┴───────────┴────────────────────────┴───────────┴─────────┴─────────┘
+  Task colors: v3 · mapper · toolbox · electrodb · dynamoose
+
+  p50 (median) latency (ns) — heatmap per column (green = fastest, red = slowest)
+  ┌───────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
+  │ Stack     │ put     │ get     │ update  │ query   │ delete  │
+  ├───────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
+  │ v3 doc    │ 90,417  │ 95,209  │ 106,291 │ 94,750  │ 90,125  │
+  │ mapper v3 │ 88,083  │ 98,417  │ 115,458 │ 95,375  │ 89,833  │
+  │ toolbox   │ 96,708  │ 115,208 │ 135,166 │ 115,583 │ 93,917  │
+  │ electrodb │ 126,250 │ 126,375 │ 162,959 │ 137,625 │ 128,583 │
+  │ dynamoose │ 357,584 │ 376,459 │ 544,334 │ 527,542 │ 258,854 │
+  └───────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+
+  Copy-friendly Markdown (no ANSI):
+
+  p50 (median) latency (ns)
+
+| Stack | put | get | update | query | delete |
+| --- | --- | --- | --- | --- | --- |
+| v3 doc | 90,417 | 95,209 | 106,291 | 94,750 | 90,125 |
+| mapper v3 | 88,083 | 98,417 | 115,458 | 95,375 | 89,833 |
+| toolbox | 96,708 | 115,208 | 135,166 | 115,583 | 93,917 |
+| electrodb | 126,250 | 126,375 | 162,959 | 137,625 | 128,583 |
+| dynamoose | 357,584 | 376,459 | 544,334 | 527,542 | 258,854 |
+
+  p90 latency (ns) — heatmap per column (green = fastest, red = slowest)
+  ┌───────────┬─────────┬─────────┬─────────┬───────────┬─────────┐
+  │ Stack     │ put     │ get     │ update  │ query     │ delete  │
+  ├───────────┼─────────┼─────────┼─────────┼───────────┼─────────┤
+  │ v3 doc    │ 132,445 │ 178,417 │ 249,192 │ 139,708   │ 158,791 │
+  │ mapper v3 │ 117,208 │ 195,492 │ 303,334 │ 139,375   │ 156,542 │
+  │ toolbox   │ 152,042 │ 320,742 │ 370,920 │ 218,625   │ 153,554 │
+  │ electrodb │ 181,250 │ 201,167 │ 345,841 │ 284,759   │ 223,975 │
+  │ dynamoose │ 626,734 │ 708,225 │ 897,791 │ 1,090,917 │ 424,604 │
+  └───────────┴─────────┴─────────┴─────────┴───────────┴─────────┘
+
+  Copy-friendly Markdown (no ANSI):
+
+  p90 latency (ns)
+
+| Stack | put | get | update | query | delete |
+| --- | --- | --- | --- | --- | --- |
+| v3 doc | 132,445 | 178,417 | 249,192 | 139,708 | 158,791 |
+| mapper v3 | 117,208 | 195,492 | 303,334 | 139,375 | 156,542 |
+| toolbox | 152,042 | 320,742 | 370,920 | 218,625 | 153,554 |
+| electrodb | 181,250 | 201,167 | 345,841 | 284,759 | 223,975 |
+| dynamoose | 626,734 | 708,225 | 897,791 | 1,090,917 | 424,604 |
+
+  median(batch p90) (ns) — heatmap per column (green = fastest, red = slowest)
+  ┌───────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
+  │ Stack     │ put     │ get     │ update  │ query   │ delete  │
+  ├───────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
+  │ v3 doc    │ 106,808 │ 145,692 │ 174,484 │ 128,234 │ 138,883 │
+  │ mapper v3 │ 102,709 │ 165,325 │ 204,308 │ 128,091 │ 132,158 │
+  │ toolbox   │ 135,712 │ 200,133 │ 247,008 │ 178,850 │ 135,229 │
+  │ electrodb │ 169,075 │ 183,692 │ 238,075 │ 210,300 │ 187,592 │
+  │ dynamoose │ 555,533 │ 602,083 │ 825,121 │ 833,475 │ 361,775 │
+  └───────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+
+  Copy-friendly Markdown (no ANSI):
+
+  median of per-batch p90 (ns)
+
+| Stack | put | get | update | query | delete |
+| --- | --- | --- | --- | --- | --- |
+| v3 doc | 106,808 | 145,692 | 174,484 | 128,234 | 138,883 |
+| mapper v3 | 102,709 | 165,325 | 204,308 | 128,091 | 132,158 |
+| toolbox | 135,712 | 200,133 | 247,008 | 178,850 | 135,229 |
+| electrodb | 169,075 | 183,692 | 238,075 | 210,300 | 187,592 |
+| dynamoose | 555,533 | 602,083 | 825,121 | 833,475 | 361,775 |
+
+  Note: v2 DocumentClient tasks are omitted in measure-only (no supported no-network path without a non-representative fake client).
+

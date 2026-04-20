@@ -74,8 +74,7 @@ export function buildMeasureOnlySharedDynamoDb(
   };
 
   const buildHttpResponse = (request: FakeHttpRequest): { response: FakeHttpResponse } => {
-    const targetRaw =
-      request.headers["X-Amz-Target"] ?? request.headers["x-amz-target"] ?? "";
+    const targetRaw = request.headers["X-Amz-Target"] ?? request.headers["x-amz-target"] ?? "";
     const operation = targetRaw.split(".").pop();
     const bodyBuf = Buffer.from(JSON.stringify(jsonBodyForOperation(operation)));
     return {

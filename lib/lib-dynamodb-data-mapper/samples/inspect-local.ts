@@ -3,6 +3,7 @@
  */
 import { ListTablesCommand } from "@aws-sdk/client-dynamodb";
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
+
 import { createLocalClients } from "../src/client";
 import { USER_TABLE_NAME } from "./user-table";
 
