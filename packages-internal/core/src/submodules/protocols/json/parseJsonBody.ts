@@ -1,12 +1,36 @@
 import type { HttpResponse, SerdeFunctions } from "@smithy/types";
 
 import { collectBodyString } from "../common";
+import { perfSlicesEnabled, recordSlice, resetPerfSlices } from "./responsePerfSlices";
 
 /**
  * @internal
  */
-export const parseJsonBody = (streamBody: any, context: SerdeFunctions): any =>
-  collectBodyString(streamBody, context).then((encoded) => {
+export const parseJsonBody = (streamBody: any, context: SerdeFunctions): any => {
+  if (perfSlicesEnabled()) {
+    resetPerfSlices();
+    const tCollect = performance.now();
+    return collectBodyString(streamBody, context).then((encoded) => {
+      recordSlice("collect_body_ms", performance.now() - tCollect);
+      if (encoded.length) {
+        try {
+          const tParse = performance.now();
+          const parsed = JSON.parse(encoded);
+          recordSlice("json_parse_ms", performance.now() - tParse);
+          return parsed;
+        } catch (e: any) {
+          if (e?.name === "SyntaxError") {
+            Object.defineProperty(e, "$responseBodyText", {
+              value: encoded,
+            });
+          }
+          throw e;
+        }
+      }
+      return {};
+    });
+  }
+  return collectBodyString(streamBody, context).then((encoded) => {
     if (encoded.length) {
       try {
         return JSON.parse(encoded);
@@ -21,6 +45,7 @@ export const parseJsonBody = (streamBody: any, context: SerdeFunctions): any =>
     }
     return {};
   });
+};
 
 /**
  * @internal

@@ -2,9 +2,12 @@ import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 import type { KeyInput, RowShape, SchemaDef } from "./schema";
 
-/** Options passed when binding a schema to the document client. */
+/** Options passed when binding a schema to the document client (region, credentials, middleware all live on `client`). */
 export interface ForTableOptions {
-  /** Same stack as the rest of the app; mapper only calls `.send(...)`. */
+  /**
+   * Shared `DynamoDBDocumentClient`; the mapper only calls `.send(...)` on commands it constructs.
+   * Use the same client instance your app uses elsewhere so retries, logging, and tracing stay consistent.
+   */
   client: DynamoDBDocumentClient;
 }
 

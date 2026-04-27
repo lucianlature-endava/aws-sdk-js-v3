@@ -4,6 +4,7 @@
 /build/
 /coverage/
 /docs/
+/temp/
 *.tsbuildinfo
 *.tgz
 *.log

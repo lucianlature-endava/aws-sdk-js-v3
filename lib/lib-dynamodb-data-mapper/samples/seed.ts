@@ -11,6 +11,7 @@ const SEED_ROWS = [
     profileKey: "profile",
     name: "Ada Lovelace",
     email: "ada@example.com",
+    body: "",
     version: 1,
   },
   {
@@ -18,6 +19,7 @@ const SEED_ROWS = [
     profileKey: "settings",
     name: "Ada (settings row)",
     email: "ada-settings@example.com",
+    body: "",
     version: 1,
   },
   {
@@ -25,6 +27,7 @@ const SEED_ROWS = [
     profileKey: "profile",
     name: "Alan Turing",
     email: "alan@example.com",
+    body: "",
     version: 1,
   },
   {
@@ -32,6 +35,7 @@ const SEED_ROWS = [
     profileKey: "profile",
     name: "Grace Hopper",
     email: "grace@example.com",
+    body: "",
     version: 1,
   },
 ] as const;

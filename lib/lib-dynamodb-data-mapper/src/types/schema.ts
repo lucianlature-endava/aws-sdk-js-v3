@@ -26,13 +26,36 @@ export interface PrimaryIndex {
 }
 
 /**
- * Full table schema: application `attributes` plus `indexes.primary` (pk/sk mapping).
- * GSI/LSI are out of scope for these types.
+ * Global secondary index: own partition + sort key fields (logical → physical like primary).
+ * `indexName` is the DynamoDB `IndexName` sent on Query/Scan.
+ */
+export interface GlobalSecondaryIndexDef {
+  indexName: string;
+  pk: IndexField;
+  sk: IndexField;
+}
+
+/**
+ * Local secondary index: shares the table’s partition key; alternate sort key field.
+ * `indexName` is the DynamoDB `IndexName` on Query.
+ */
+export interface LocalSecondaryIndexDef {
+  indexName: string;
+  sk: IndexField;
+}
+
+/**
+ * Full table schema: application `attributes` plus key indexes.
+ * Secondary indexes are **type-level** for API design; runtime mapping may not implement them yet.
  */
 export interface SchemaDef<A extends Record<string, AttributeDef> = Record<string, AttributeDef>> {
   attributes: A;
   indexes: {
     primary: PrimaryIndex;
+    /** Named GSIs (keys are stable API names, e.g. `byEmail`). */
+    gsi?: Record<string, GlobalSecondaryIndexDef>;
+    /** Named LSIs (keys are stable API names). */
+    lsi?: Record<string, LocalSecondaryIndexDef>;
   };
 }
 
@@ -67,5 +90,7 @@ export type SchemaDefLinked<A extends Record<string, AttributeDef>> = {
   attributes: A;
   indexes: {
     primary: PrimaryIndexLinked<A>;
+    gsi?: Record<string, GlobalSecondaryIndexDef>;
+    lsi?: Record<string, LocalSecondaryIndexDef>;
   };
 };

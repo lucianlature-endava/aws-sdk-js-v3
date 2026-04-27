@@ -1,4 +1,22 @@
 {
   "extends": "../../api-extractor.lib.json",
-  "mainEntryPointFilePath": "./dist-types/index.d.ts"
+  "mainEntryPointFilePath": "./dist-types/index.d.ts",
+  "docModel": {
+    "enabled": true,
+    "apiJsonFilePath": "./temp/<unscopedPackageName>.api.json"
+  },
+  "apiReport": {
+    "enabled": false
+  },
+  "messages": {
+    "extractorMessageReporting": {
+      "ae-unresolved-link": { "logLevel": "none" }
+    },
+    "tsdocMessageReporting": {
+      "tsdoc-undefined-tag": { "logLevel": "none" },
+      "tsdoc-escape-greater-than": { "logLevel": "none" },
+      "tsdoc-malformed-html-name": { "logLevel": "none" },
+      "tsdoc-missing-deprecation-message": { "logLevel": "none" }
+    }
+  }
 }

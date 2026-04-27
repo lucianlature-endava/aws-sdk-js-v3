@@ -1,5 +1,6 @@
 /**
- * Minimal **`put` / `get` / `update` / `query` / `delete`** benchmark on **DynamoDB Local** (default) or **measure-only**
+ * Minimal **`put` / `get` / `update` / `query` / `delete`** benchmark on **DynamoDB Local** (default), **AWS DynamoDB**
+ * (**`--with-aws`** — regional endpoint + default credential chain), or **measure-only**
  * (fake handler, no socket): **TinyBench** only — same stacks as `samples/micro-bench-comparison.ts`: **`v3 doc`**,
  * **mapper v3**, **Toolbox**, **ElectroDB**, **Dynamoose**.
  *
@@ -18,6 +19,10 @@
  * **`MINIMAL_QUERY_N_OPS_PER_ITER`** (default **1**, range **1–100**): runs **N** ops inside each TinyBench task
  * callback, amortizing bench per-iteration overhead so steady-state library differences widen. With **N \> 1**,
  * reported p50 / mean are **per iteration of N ops**; divide by **N** for per-op numbers.
+ *
+ * **`MINIMAL_QUERY_PAYLOAD`** (default **`minimal`**) or **`--payload=minimal|tiny|small|large`** — row payload model
+ * adapted from **`JavaScript-csm`** `itemFactory`: **`body`** pads UTF-8 key+value total to ~**4 000** (**small**) or ~**400 000** (**large**);
+ * **`minimal`** / **`tiny`** keeps **`body: ""`** (smallest wire item).
  *
  * **`MICRO_BENCH_GC=1`** + **`node --expose-gc`**: optional `global.gc()` immediately before **`Bench.run`**.
  *
@@ -53,6 +58,10 @@
  *
  * Run: `npx --yes tsx samples/minimal-query-bench.ts` · `yarn sample:bench:minimal-query`
  *
+ * **AWS (`--with-aws` or `MINIMAL_QUERY_AWS=1` / `BENCH_USE_AWS=1`):** no custom endpoint; uses `AWS_REGION` /
+ * `AWS_DEFAULT_REGION` (default **`us-east-1`**). Table: **`BENCH_DYNAMODB_TABLE`** (default **`UserTable`**).
+ * **`BENCH_ENSURE_TABLE`**: unset ⇒ **verify-only** on AWS (no **`CreateTable`**); set **`1`** to auto-create like Local.
+ *
  * **Workflow:** For measure-only + paired v3 vs mapper + optional Local paired, use **`yarn sample:bench:workflow`**
  * (`samples/bench-workflow.ts`) — this file is the **TinyBench Local smoke** step only.
  */
@@ -81,18 +90,38 @@ import { Entity as ElectroEntity } from "electrodb";
 import { Bench } from "tinybench";
 
 import { physicalKeyFromRow } from "../src/schema";
+import {
+  applyPayloadToUserRow,
+  parsePayloadPreset,
+  SIZE_PRESETS,
+} from "./bench-item-factory";
+import { createAwsBenchClients, createAwsBenchDynamoService, resolveBenchAwsRegion } from "./bench-network";
 import { buildMeasureOnlySharedDynamoDb, userItemToAttributeMap } from "./measure-only-client";
-import { ensureUserTable, USER_TABLE_NAME, UserSchema, userTableHandle } from "./user-table";
+import { ensureBenchTable, USER_TABLE_NAME, UserSchema, userTableHandle } from "./user-table";
 
 const TABLE = USER_TABLE_NAME;
 const LOCAL_ENDPOINT = "http://localhost:8000";
 
 const PARTITION_USER_ID = "minbench-user-42";
-const ROWS = [
+
+const PAYLOAD_PRESET = parsePayloadPreset();
+const ROW_TEMPLATES = [
   { userId: PARTITION_USER_ID, profileKey: "a", name: "Alice", email: "a@example.com", version: 1 },
   { userId: PARTITION_USER_ID, profileKey: "b", name: "Bob", email: "b@example.com", version: 1 },
   { userId: PARTITION_USER_ID, profileKey: "c", name: "Carol", email: "c@example.com", version: 1 },
 ] as const;
+const ROWS = ROW_TEMPLATES.map((r) =>
+  applyPayloadToUserRow(
+    {
+      userId: r.userId,
+      profileKey: r.profileKey,
+      name: r.name,
+      email: r.email,
+      version: r.version,
+    },
+    PAYLOAD_PRESET,
+  ),
+);
 
 /** Single-row targets for put / get / delete (same wire item shape as `micro-bench-comparison.ts`). */
 const BENCH_ROW = ROWS[0]!;
@@ -112,6 +141,12 @@ const TB_TIME_MS = parseEnvPositiveIntMs("MINIMAL_QUERY_TB_TIME_MS", 2500, 120_0
 /** Fake-handler mode: runs the full SDK stack without socket I/O (library overhead becomes legible). */
 const MEASURE_ONLY =
   process.argv.includes("--measure-only") || process.env.MINIMAL_QUERY_MEASURE_ONLY === "1";
+
+/** Regional DynamoDB (production-like): default credentials, no `DYNAMODB_ENDPOINT`. Ignored when `--measure-only`. */
+const WITH_AWS =
+  process.argv.includes("--with-aws") ||
+  process.env.MINIMAL_QUERY_AWS === "1" ||
+  process.env.BENCH_USE_AWS === "1";
 
 /** Runs N ops per TinyBench iteration; p50/mean are **per iteration of N ops** when N \> 1. */
 function parseNOpsPerIter(): number {
@@ -599,6 +634,7 @@ function buildToolboxTableAndEntity(docClient: DynamoDBDocumentClient) {
       profileKey: string(),
       name: string(),
       email: string(),
+      body: string(),
       version: number(),
     }),
     timestamps: false,
@@ -616,6 +652,7 @@ function buildElectroEntity(docClient: DynamoDBDocumentClient) {
         profileKey: { type: "string", required: true },
         name: { type: "string" },
         email: { type: "string" },
+        body: { type: "string" },
         version: { type: "number" },
       },
       indexes: {
@@ -637,6 +674,7 @@ function buildDynamooseModel() {
     profileKey: { type: String },
     name: { type: String },
     email: { type: String },
+    body: { type: String },
     version: { type: Number },
   });
   return dynamoose.model("BenchUser", schema, {
@@ -718,6 +756,20 @@ async function primeDocClientV3Paths(
 }
 
 async function main() {
+  if (MEASURE_ONLY && WITH_AWS) {
+    console.warn(
+      style("33", "[bench] --with-aws is ignored with --measure-only (fake handler)."),
+    );
+  }
+  if (!MEASURE_ONLY && WITH_AWS && process.env.DYNAMODB_ENDPOINT?.trim()) {
+    console.warn(
+      style(
+        "33",
+        "[bench] DYNAMODB_ENDPOINT is set but --with-aws targets regional DynamoDB — unset DYNAMODB_ENDPOINT for AWS.",
+      ),
+    );
+  }
+
   const benchPhysicalEarly = physicalKeyFromRow(
     UserSchema,
     BENCH_ROW as unknown as Record<string, unknown>,
@@ -733,11 +785,19 @@ async function main() {
         profileKey: BENCH_ROW.profileKey,
         name: BENCH_ROW.name,
         email: BENCH_ROW.email,
+        body: BENCH_ROW.body,
         version: BENCH_ROW.version,
       }),
     );
     docClient = DocClient.from(fakeDdb);
     dynamoose.aws.ddb.set(fakeDdb);
+  } else if (WITH_AWS) {
+    const { ddbClient, docClient: awsDoc } = createAwsBenchClients();
+    docClient = awsDoc;
+    dynamoose.aws.ddb.set(createAwsBenchDynamoService());
+
+    await ensureBenchTable(ddbClient, "aws");
+    await seed(docClient);
   } else {
     const ddbClient = new DynamoDBClient({
       endpoint: LOCAL_ENDPOINT,
@@ -756,7 +816,7 @@ async function main() {
       }),
     );
 
-    await ensureUserTable(ddbClient);
+    await ensureBenchTable(ddbClient, "local");
     await seed(docClient);
   }
 
@@ -781,7 +841,7 @@ async function main() {
     style("1;37", "  Minimal op bench — ") +
       style(
         "36",
-        `TinyBench · put/get/update/query/delete · v3 / mapper / toolbox / electrodb / dynamoose · ${MEASURE_ONLY ? "measure-only (fake handler, no socket)" : "Local"}`,
+        `TinyBench · put/get/update/query/delete · v3 / mapper / toolbox / electrodb / dynamoose · ${MEASURE_ONLY ? "measure-only (fake handler, no socket)" : WITH_AWS ? "AWS DynamoDB" : "Local"}`,
       ),
   );
   console.log(
@@ -809,6 +869,13 @@ async function main() {
         "  --measure-only: fake requestHandler returns canned DynamoDB JSON per X-Amz-Target; no socket I/O. Library overhead visible; not comparable to Local numbers.",
       ),
     );
+  } else if (WITH_AWS) {
+    console.log(
+      style(
+        "33",
+        `  --with-aws: regional DynamoDB · region=${resolveBenchAwsRegion()} · table=${TABLE} · credentials=default chain · BENCH_ENSURE_TABLE unset ⇒ verify table only (no CreateTable).`,
+      ),
+    );
   }
   if (PAIRED) {
     console.log(
@@ -828,6 +895,18 @@ async function main() {
   console.log(`  ${style("1;36", "partition pk (query)")}  : ${style("37", pkPartition)}`);
   console.log(
     `  ${style("1;36", "put/get/update/delete key")} : ${style("37", `pk=${benchPk} sk=${benchSk}`)}`,
+  );
+  console.log(
+    `  ${style("1;36", "payload")}               : ${style(
+      "37",
+      `${PAYLOAD_PRESET}${
+        PAYLOAD_PRESET === "minimal"
+          ? " (body \"\")"
+          : PAYLOAD_PRESET === "small"
+            ? ` (~${SIZE_PRESETS.Small} UTF-8 B item target)`
+            : ` (~${SIZE_PRESETS.Large} UTF-8 B item target)`
+      }`,
+    )}`,
   );
   console.log("");
 
@@ -917,6 +996,7 @@ async function main() {
             profileKey: BENCH_ROW.profileKey,
             name: BENCH_ROW.name,
             email: BENCH_ROW.email,
+            body: BENCH_ROW.body,
             version: BENCH_ROW.version,
           })
           .send(),
@@ -932,6 +1012,7 @@ async function main() {
   //       profileKey: BENCH_ROW.profileKey,
   //       name: BENCH_ROW.name,
   //       email: BENCH_ROW.email,
+  //       body: BENCH_ROW.body,
   //       version: BENCH_ROW.version,
   //     },
   //     { overwrite: true },
@@ -1006,6 +1087,7 @@ async function main() {
             profileKey: BENCH_ROW.profileKey,
             name: BENCH_ROW.name,
             email: BENCH_ROW.email,
+            body: BENCH_ROW.body,
             version: BENCH_ROW.version,
           })
           .send(),
@@ -1020,6 +1102,7 @@ async function main() {
             profileKey: BENCH_ROW.profileKey,
             name: BENCH_ROW.name,
             email: BENCH_ROW.email,
+            body: BENCH_ROW.body,
             version: BENCH_ROW.version,
           },
           { overwrite: true },

@@ -6,6 +6,8 @@ const userTableAttributes = {
   profileKey: { type: "string" as const },
   name: { type: "string" as const },
   email: { type: "string" as const },
+  /** Payload padding for size-targeted benches (`bench-item-factory.ts`); use `""` when unused. */
+  body: { type: "string" as const },
   version: { type: "number" as const, versionAttribute: true },
 } satisfies Record<string, AttributeDef>;
 

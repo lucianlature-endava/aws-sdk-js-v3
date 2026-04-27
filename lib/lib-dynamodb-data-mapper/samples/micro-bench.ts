@@ -19,6 +19,7 @@ const row = {
   profileKey: "profile",
   name: "Alice",
   email: "alice@example.com",
+  body: "",
   version: 1,
 } as const;
 

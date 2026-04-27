@@ -13,7 +13,7 @@
  * chunks **consecutive** samples into groups of `BATCH_SIZE` and takes **median** of per-chunk **p90**
  * (robust batch-level tail without parallel distortion).
  *
- * Pick **exactly one** mode (mutually exclusive):
+ * Pick **exactly one** mode (mutually exclusive): **`--measure-only`** · **`--with-local`** · **`--with-aws`**
  *
  * - **`--measure-only`** — **shared** v3 `DynamoDB` client built with a **fake `requestHandler`**
  *   that returns canned DynamoDB JSON 1.0 response bodies per `X-Amz-Target` operation, so the
@@ -26,6 +26,12 @@
  *   doc-client marshal/unmarshal + each library's mapping** cost.
  * - **`--with-local`** — real RTT to **[DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html)**
  *   on port 8000 (`docker compose up -d`). Dominated by Local/JVM latency.
+ * - **`--with-aws`** (or **`MICRO_BENCH_AWS=1`**, **`BENCH_USE_AWS=1`**) — regional **DynamoDB** in the
+ *   account/region from the default **credential provider chain** (no `DYNAMODB_ENDPOINT`). **Table**:
+ *   **`BENCH_DYNAMODB_TABLE`** (default `UserTable`). **`BENCH_ENSURE_TABLE`**: unset on AWS ⇒ **verify
+ *   only** (no `CreateTable`); set **`1`** to auto-create. After the matrix, **`--paired-with-aws`**
+ *   (**`MICRO_BENCH_PAIRED_AWS=1`**) runs the same-window **v3 doc vs mapper** pairing against AWS (same
+ *   role as **`--paired-with-local`** on Local).
  *
  * **Timing model (what `run()` includes):** The harness builds **one** shared service client (and
  * **`DynamoDBDocumentClient.from`**) **before** the matrix; **DataMapper / Toolbox / Electro / Dynamoose**
@@ -39,15 +45,16 @@
  *
  * **`--cold-client`** (or **`MICRO_BENCH_COLD_CLIENT=1`**) — each timed sample runs **`new` low-level
  * client → `DynamoDBDocumentClient.from` → fresh mapper / Toolbox / Electro handles on that doc client →
- * one op → `destroy()`** (measure-only and Local). **Dynamoose:** fresh service **`DynamoDB`** +
- * **`dynamoose.aws.ddb.set`** per sample. **v2** `DocumentClient`: recreated per sample on Local. **No**
+ * one op → `destroy()`** (measure-only, Local, and AWS). **Dynamoose:** fresh service **`DynamoDB`** +
+ * **`dynamoose.aws.ddb.set`** per sample. **v2** `DocumentClient`: recreated per sample. **No**
  * matrix prime and **no** per-task warmup. Incompatible with **`--paired-breakdown`** /
- * **`--paired-with-local`**. **`--breakdown`** in measure-only still works (each new client is patched per
+ * **`--paired-with-local`**, and **`--paired-with-aws`**. **`--breakdown`** in measure-only still works (each new client is patched per
  * sample).
  *
  * Run from package root:
  *   `yarn sample:bench:compare -- --measure-only`
  *   `yarn sample:bench:compare -- --with-local`
+ *   `yarn sample:bench:compare -- --with-aws`
  *   `yarn sample:bench:compare -- --measure-only --cold-client`
  *
  * **Orchestration:** `yarn sample:bench:workflow` runs **TinyBench** smoke (`minimal-query-bench.ts`) then
@@ -153,11 +160,12 @@ import process from "node:process";
 
 import { createLocalClients } from "../src/client";
 import { physicalKeyFromRow } from "../src/schema";
+import { createAwsBenchClients, createAwsBenchDynamoService, resolveBenchAwsRegion } from "./bench-network";
 import {
   buildMeasureOnlySharedDynamoDb as buildMeasureOnlySharedDynamoDbShared,
   userItemToAttributeMap,
 } from "./measure-only-client";
-import { ensureUserTable, USER_TABLE_NAME, UserSchema, userTableHandle } from "./user-table";
+import { ensureBenchTable, USER_TABLE_NAME, UserSchema, userTableHandle } from "./user-table";
 
 const TABLE = USER_TABLE_NAME;
 
@@ -170,6 +178,7 @@ const row = {
   profileKey: "profile",
   name: "Alice",
   email: "alice@example.com",
+  body: "",
   version: 1,
 } as const;
 
@@ -184,9 +193,19 @@ const measureOnly = process.argv.includes("--measure-only");
 /** After the Local matrix: same-window **v3 doc** vs **mapper v3** on DynamoDB Local (wall time only). */
 const wantPairedWithLocal =
   process.argv.includes("--paired-with-local") || process.env.MICRO_BENCH_PAIRED_LOCAL === "1";
+/** Same-window paired run against **AWS DynamoDB** (requires `--with-aws` or implied by this flag). */
+const wantPairedWithAws =
+  process.argv.includes("--paired-with-aws") || process.env.MICRO_BENCH_PAIRED_AWS === "1";
+/** Real AWS account/region (default credential chain; no `DYNAMODB_ENDPOINT`). */
+const withAws =
+  process.argv.includes("--with-aws") ||
+  process.env.MICRO_BENCH_AWS === "1" ||
+  process.env.BENCH_USE_AWS === "1" ||
+  (wantPairedWithAws && !measureOnly);
 /** Implies Local when `--paired-with-local` is used (no redundant `--with-local` required). */
 const withLocal =
-  process.argv.includes("--with-local") || (wantPairedWithLocal && !measureOnly);
+  !withAws &&
+  (process.argv.includes("--with-local") || (wantPairedWithLocal && !measureOnly));
 const wantBreakdown =
   process.argv.includes("--breakdown") || process.env.MICRO_BENCH_BREAKDOWN === "1";
 const wantPairedBreakdown =
@@ -392,6 +411,15 @@ async function runWithFreshLocalDocStack(work: (docClient: DynamoDBDocumentClien
   }
 }
 
+async function runWithFreshAwsDocStack(work: (docClient: DynamoDBDocumentClient) => Promise<unknown>): Promise<void> {
+  const { ddbClient, docClient } = createAwsBenchClients();
+  try {
+    await work(docClient);
+  } finally {
+    destroyDdbClient(ddbClient);
+  }
+}
+
 /** Same service client shape as the non-cold Dynamoose branch in `main` (raw `DynamoDB`, not document). */
 function newLocalDynamooseServiceClient(): DynamoDB {
   return new DynamoDB({
@@ -422,6 +450,16 @@ async function runWithFreshMeasureDynamooseStack(
 
 async function runWithFreshLocalDynamooseStack(work: () => Promise<unknown>): Promise<void> {
   const ddb = newLocalDynamooseServiceClient();
+  dynamoose.aws.ddb.set(ddb);
+  try {
+    await work();
+  } finally {
+    destroyDdbClient(ddb);
+  }
+}
+
+async function runWithFreshAwsDynamooseStack(work: () => Promise<unknown>): Promise<void> {
+  const ddb = createAwsBenchDynamoService();
   dynamoose.aws.ddb.set(ddb);
   try {
     await work();
@@ -941,8 +979,8 @@ function warnMapperV3ShouldNotBeatRawV3Doc(
   breakdownSummaries?: TaskBreakdownSummary[],
   /** When set, violations below are about **standalone** matrix rows only; paired table above is fairer for v3 vs mapper. */
   pairedBreakdownRan?: boolean,
-  /** Same-window **with-local** paired wall table was printed — use it for v3 vs mapper, not the matrix. */
-  pairedWithLocalRan?: boolean,
+  /** Same-window paired wall (**with-local** or **with-aws**) was printed — fairer v3 vs mapper than the standalone matrix. */
+  pairedWallRan?: boolean,
   /** Cold path bundles `from` + library setup with the op; skip hot-path matrix invariant (incompatible with paired modes). */
   coldClient?: boolean
 ): void {
@@ -1015,9 +1053,9 @@ function warnMapperV3ShouldNotBeatRawV3Doc(
         "2",
         pairedBreakdownRan
           ? "These lines compare **standalone** sequential windows (different batches than the **paired** table above). For v3 doc vs mapper v3, trust the **paired** rows + **Δsdk**; standalone jitter can still violate this check. Otherwise: raise MICRO_BENCH_WARMUP_MS / MICRO_BENCH_MEASURE_MS, MICRO_BENCH_GC=1 + node --expose-gc, idle CPU."
-          : pairedWithLocalRan
-            ? "These lines are **standalone** matrix rows on DynamoDB Local; JVM/OS jitter can invert v3 vs mapper. For that pair, trust the **paired with-local** tables above (**Paired with-local** + **Δ wall**)."
-            : "Usually JIT/GC noise — use `--paired-breakdown` (measure-only) or `--paired-with-local` (Local), or raise MICRO_BENCH_WARMUP_MS / MICRO_BENCH_MEASURE_MS, MICRO_BENCH_GC=1 + node --expose-gc, idle CPU."
+          : pairedWallRan
+            ? "These lines are **standalone** matrix rows; RTT/GC jitter can invert v3 vs mapper. For that pair, trust the **paired wall** tables above (**paired-with-local** or **paired-with-aws** + **Δ wall**)."
+            : "Usually JIT/GC noise — use `--paired-breakdown` (measure-only), `--paired-with-local` (Local), or `--paired-with-aws`, or raise MICRO_BENCH_WARMUP_MS / MICRO_BENCH_MEASURE_MS, MICRO_BENCH_GC=1 + node --expose-gc, idle CPU."
       )
   );
   console.error("");
@@ -1807,7 +1845,7 @@ function printLatencyMatrixNs(
 
 function printFormattedBenchOutput(
   results: Map<string, LatencySummary>,
-  mode: "measure-only" | "with-local",
+  mode: "measure-only" | "with-local" | "with-aws",
   coldClient: boolean
 ): void {
   const modeLabel =
@@ -1818,12 +1856,19 @@ function printFormattedBenchOutput(
             ? "measure-only · cold path (new client + one op per sample)"
             : "measure-only (no I/O, sequential per-call)"
         )
-      : style(
-          "36",
-          coldClient
-            ? "DynamoDB Local · cold path (new client + one op per sample)"
-            : "DynamoDB Local (sequential per-call)"
-        );
+      : mode === "with-aws"
+        ? style(
+            "36",
+            coldClient
+              ? "AWS DynamoDB · cold path (new client + one op per sample)"
+              : "AWS DynamoDB (sequential per-call)"
+          )
+        : style(
+            "36",
+            coldClient
+              ? "DynamoDB Local · cold path (new client + one op per sample)"
+              : "DynamoDB Local (sequential per-call)"
+          );
   console.log(style("1;37", "\n═══════════════════════════════════════════════════════════════════"));
   console.log(
     style("1;37", "  DynamoDB stack comparison — ") + modeLabel + style("1;37", " (same keys as micro-bench.ts)")
@@ -1920,6 +1965,7 @@ function buildToolboxTableAndEntity(docClient: DynamoDBDocumentClient) {
       profileKey: string(),
       name: string(),
       email: string(),
+      body: string(),
       version: number(),
     }),
     timestamps: false,
@@ -1937,6 +1983,7 @@ function buildElectroEntity(docClient: DynamoDBDocumentClient) {
         profileKey: { type: "string", required: true },
         name: { type: "string" },
         email: { type: "string" },
+        body: { type: "string" },
         version: { type: "number" },
       },
       indexes: {
@@ -1958,6 +2005,7 @@ function buildDynamooseModel() {
     profileKey: { type: String },
     name: { type: String },
     email: { type: String },
+    body: { type: String },
     version: { type: Number },
   });
   return dynamoose.model("BenchUser", schema, {
@@ -1972,6 +2020,8 @@ type CompareTaskDef = { name: string; run: () => Promise<unknown> };
 function buildCompareTaskDefs(p: {
   cold: boolean;
   measureOnly: boolean;
+  /** Where cold-path / v2 stacks send traffic (`aws` ⇒ regional endpoint + default credentials). */
+  trafficMode: "measure-only" | "local" | "aws";
   breakdownMeter: BreakdownMeter | null;
   docClient: DynamoDBDocumentClient;
   docV2: AWS.DynamoDB.DocumentClient | undefined;
@@ -1984,6 +2034,7 @@ function buildCompareTaskDefs(p: {
   const {
     cold,
     measureOnly,
+    trafficMode,
     breakdownMeter: m,
     docClient,
     docV2,
@@ -1994,22 +2045,32 @@ function buildCompareTaskDefs(p: {
     DynUser,
   } = p;
 
-  const v2Opts = {
-    region: process.env.AWS_REGION ?? "us-east-1",
-    endpoint: process.env.DYNAMODB_ENDPOINT ?? "http://localhost:8000",
-    credentials: new AWS.Credentials(
-      process.env.AWS_ACCESS_KEY_ID ?? "local",
-      process.env.AWS_SECRET_ACCESS_KEY ?? "local"
-    ),
-  };
+  const v2Opts =
+    trafficMode === "aws"
+      ? { region: resolveBenchAwsRegion() }
+      : {
+          region: process.env.AWS_REGION ?? "us-east-1",
+          endpoint: process.env.DYNAMODB_ENDPOINT ?? "http://localhost:8000",
+          credentials: new AWS.Credentials(
+            process.env.AWS_ACCESS_KEY_ID ?? "local",
+            process.env.AWS_SECRET_ACCESS_KEY ?? "local"
+          ),
+        };
 
   const wrapColdDoc = (fn: (dc: DynamoDBDocumentClient) => Promise<unknown>): (() => Promise<unknown>) => {
-    return () => (measureOnly ? runWithFreshMeasureDocStack(m, fn) : runWithFreshLocalDocStack(fn));
+    return () => {
+      if (measureOnly) return runWithFreshMeasureDocStack(m, fn);
+      if (trafficMode === "aws") return runWithFreshAwsDocStack(fn);
+      return runWithFreshLocalDocStack(fn);
+    };
   };
 
   const wrapColdDyn = (fn: () => Promise<unknown>): (() => Promise<unknown>) => {
-    return () =>
-      measureOnly ? runWithFreshMeasureDynamooseStack(m, fn) : runWithFreshLocalDynamooseStack(fn);
+    return () => {
+      if (measureOnly) return runWithFreshMeasureDynamooseStack(m, fn);
+      if (trafficMode === "aws") return runWithFreshAwsDynamooseStack(fn);
+      return runWithFreshLocalDynamooseStack(fn);
+    };
   };
 
   const wrapV2 = (hot: () => Promise<unknown>, coldRun: () => Promise<unknown>): (() => Promise<unknown>) => {
@@ -2068,6 +2129,7 @@ function buildCompareTaskDefs(p: {
                 profileKey: row.profileKey,
                 name: row.name,
                 email: row.email,
+                body: row.body,
                 version: row.version,
               })
               .send();
@@ -2082,6 +2144,7 @@ function buildCompareTaskDefs(p: {
                 profileKey: row.profileKey,
                 name: row.name,
                 email: row.email,
+                body: row.body,
                 version: row.version,
               })
               .send(),
@@ -2102,6 +2165,7 @@ function buildCompareTaskDefs(p: {
                 profileKey: row.profileKey,
                 name: row.name,
                 email: row.email,
+                body: row.body,
                 version: row.version,
               },
               { overwrite: true }
@@ -2116,6 +2180,7 @@ function buildCompareTaskDefs(p: {
                 profileKey: row.profileKey,
                 name: row.name,
                 email: row.email,
+                body: row.body,
                 version: row.version,
               },
               { overwrite: true }
@@ -2404,9 +2469,17 @@ async function main() {
     console.error("Use only one of --measure-only or --with-local.");
     process.exit(1);
   }
-  if (!withLocal && !measureOnly) {
+  if (withAws && measureOnly) {
+    console.error("Use only one of --measure-only or --with-aws.");
+    process.exit(1);
+  }
+  if (withLocal && withAws) {
+    console.error("Use only one of --with-local or --with-aws (not both).");
+    process.exit(1);
+  }
+  if (!withLocal && !measureOnly && !withAws) {
     console.error(
-      "Pick exactly one mode:\n  yarn sample:bench:compare -- --measure-only\n  yarn sample:bench:compare -- --with-local"
+      "Pick exactly one mode:\n  yarn sample:bench:compare -- --measure-only\n  yarn sample:bench:compare -- --with-local\n  yarn sample:bench:compare -- --with-aws"
     );
     process.exit(1);
   }
@@ -2430,6 +2503,18 @@ async function main() {
     console.error("Use only one of --paired-breakdown or --paired-with-local.");
     process.exit(1);
   }
+  if (wantPairedWithAws && measureOnly) {
+    console.error("--paired-with-aws cannot be used with --measure-only.");
+    process.exit(1);
+  }
+  if (wantPairedWithAws && wantPairedWithLocal) {
+    console.error("Use only one of --paired-with-local or --paired-with-aws.");
+    process.exit(1);
+  }
+  if (wantPairedWithAws && wantPairedBreakdown) {
+    console.error("Use only one of --paired-breakdown or --paired-with-aws.");
+    process.exit(1);
+  }
   if (wantColdClient && wantPairedBreakdown) {
     console.error("--cold-client cannot be combined with --paired-breakdown (paired mode needs a stable client).");
     process.exit(1);
@@ -2438,8 +2523,18 @@ async function main() {
     console.error("--cold-client cannot be combined with --paired-with-local.");
     process.exit(1);
   }
+  if (wantColdClient && wantPairedWithAws) {
+    console.error("--cold-client cannot be combined with --paired-with-aws.");
+    process.exit(1);
+  }
 
-  const mode = measureOnly ? "measure-only" : "with-local";
+  const trafficMode = measureOnly ? "measure-only" : withAws ? "aws" : "local";
+  const mode =
+    trafficMode === "measure-only"
+      ? "measure-only"
+      : trafficMode === "aws"
+        ? "with-aws"
+        : "with-local";
   const breakdownMeter = measureOnly && wantBreakdown ? new BreakdownMeter() : null;
 
   let docClient: DynamoDBDocumentClient;
@@ -2456,9 +2551,17 @@ async function main() {
       patchSendForBreakdown(docClient, breakdownMeter);
     }
     dynamoose.aws.ddb.set(sharedMeasureOnlyDdb);
+  } else if (withAws) {
+    const { ddbClient, docClient: realDoc } = createAwsBenchClients();
+    await ensureBenchTable(ddbClient, "aws");
+    dynamoose.aws.ddb.set(createAwsBenchDynamoService());
+    docClient = realDoc;
+    docV2 = new AWS.DynamoDB.DocumentClient({
+      region: resolveBenchAwsRegion(),
+    });
   } else {
     const { ddbClient, docClient: realDoc } = createLocalClients();
-    await ensureUserTable(ddbClient);
+    await ensureBenchTable(ddbClient, "local");
     // Dynamoose calls `ddb().putItem` / `getItem` / … on `DynamoDB`, not `DynamoDBClient.send`.
     dynamoose.aws.ddb.set(
       new DynamoDB({
@@ -2502,6 +2605,7 @@ async function main() {
   const taskDefs = buildCompareTaskDefs({
     cold: wantColdClient,
     measureOnly,
+    trafficMode,
     breakdownMeter,
     docClient,
     docV2,
@@ -2672,7 +2776,8 @@ async function main() {
     }
   }
 
-  if (wantPairedWithLocal && withLocal) {
+  if ((wantPairedWithLocal && withLocal) || (wantPairedWithAws && withAws)) {
+    const pairedWallKind: "Local" | "AWS" = wantPairedWithAws ? "AWS" : "Local";
     const pairedOrder = parsePairedOrderFlag();
     let lastWallDeltaRows: PairedDeltaRow[] = [];
     let lastLocalLatencyRows: PairedLocalOpRow[] = [];
@@ -2690,7 +2795,7 @@ async function main() {
           throw new Error(`Internal: missing v3 doc / mapper v3 task for op "${op}"`);
         }
         const runLabel = REPEATS > 1 ? ` (run ${k + 1}/${REPEATS})` : "";
-        process.stderr.write(`\r  Paired Local ${opi}/${BENCH_OPS.length}: ${op}${runLabel}${" ".repeat(16)}`);
+        process.stderr.write(`\r  Paired ${pairedWallKind} ${opi}/${BENCH_OPS.length}: ${op}${runLabel}${" ".repeat(16)}`);
         await warmupPaired(rawDef.run, mapDef.run, WARMUP_MS, pairedOrder);
         maybeGcAfterWarmup();
         const { rawNs, mapperNs, deltaTotalNs } = await collectPairedWallSamplesNs(
@@ -2714,7 +2819,7 @@ async function main() {
       "  " +
         style(
           "2",
-          `Paired with-local iteration order: ${pairedOrder} — same idea as measure-only paired; use \`--paired-order=alternate\` to average slot bias.`
+          `Paired ${pairedWallKind === "AWS" ? "with-aws" : "with-local"} iteration order: ${pairedOrder} — same idea as measure-only paired; use \`--paired-order=alternate\` to average slot bias.`
         )
     );
     if (REPEATS > 1) {
@@ -2734,11 +2839,16 @@ async function main() {
           ">0"
         )
       );
-      printKRunInvariantSummary("K-run summary: Δwall (invariant, Local)", wallAgg, hydrateSpec(PAIRED_WALL_SPEC));
+      printKRunInvariantSummary(
+        `K-run summary: Δwall (invariant, ${pairedWallKind})`,
+        wallAgg,
+        hydrateSpec(PAIRED_WALL_SPEC)
+      );
       if (breakdownOutFile) {
         appendFileSync(
           breakdownOutFile,
-          "\n\n" + formatKRunInvariantMarkdown("K-run Δwall (invariant, Local)", wallAgg, hydrateSpec(PAIRED_WALL_SPEC)),
+          "\n\n" +
+            formatKRunInvariantMarkdown(`K-run Δwall (invariant, ${pairedWallKind})`, wallAgg, hydrateSpec(PAIRED_WALL_SPEC)),
           "utf8"
         );
         console.error(style("32", `  [Appended K-run Δwall summary to ${breakdownOutFile}]`));
@@ -2748,9 +2858,10 @@ async function main() {
 
     if (breakdownOutFile) {
       const md =
-        "## Paired with-local (v3 doc vs mapper v3)\n\n" + formatPairedWallDeltaMarkdown(lastWallDeltaRows);
+        `## Paired ${pairedWallKind === "AWS" ? "with-aws" : "with-local"} (v3 doc vs mapper v3)\n\n` +
+        formatPairedWallDeltaMarkdown(lastWallDeltaRows);
       appendFileSync(breakdownOutFile, "\n\n" + md, "utf8");
-      console.error(style("32", `  [Appended paired with-local Δ wall to ${breakdownOutFile}]`));
+      console.error(style("32", `  [Appended paired ${pairedWallKind === "AWS" ? "with-aws" : "with-local"} Δ wall to ${breakdownOutFile}]`));
       console.error("");
     }
   }
@@ -2759,7 +2870,7 @@ async function main() {
     results,
     wantBreakdown && breakdownSummaries.length > 0 ? breakdownSummaries : undefined,
     wantPairedBreakdown && !!breakdownMeter,
-    wantPairedWithLocal && withLocal,
+    (wantPairedWithLocal && withLocal) || (wantPairedWithAws && withAws),
     wantColdClient
   );
 

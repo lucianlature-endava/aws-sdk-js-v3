@@ -17,6 +17,7 @@ async function main() {
     profileKey: "profile",
     name: "Alice",
     email: "alice@example.com",
+    body: "",
     version: 1,
   });
   console.log("put: ok");

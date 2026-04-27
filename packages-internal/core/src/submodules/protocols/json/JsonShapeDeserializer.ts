@@ -22,6 +22,7 @@ import { UnionSerde } from "../UnionSerde";
 import type { JsonSettings } from "./JsonCodec";
 import { jsonReviver } from "./jsonReviver";
 import { parseJsonBody } from "./parseJsonBody";
+import { perfSlicesEnabled, recordSlice, resetPerfSlices } from "./responsePerfSlices";
 
 /**
  * @public
@@ -32,6 +33,21 @@ export class JsonShapeDeserializer extends SerdeContextConfig implements ShapeDe
   }
 
   public async read(schema: Schema, data: string | Uint8Array | unknown): Promise<any> {
+    if (perfSlicesEnabled()) {
+      let parsed: unknown;
+      if (typeof data === "string") {
+        resetPerfSlices();
+        const t0 = performance.now();
+        parsed = JSON.parse(data, jsonReviver);
+        recordSlice("json_parse_ms", performance.now() - t0);
+      } else {
+        parsed = await parseJsonBody(data, this.serdeContext!);
+      }
+      const t1 = performance.now();
+      const out = this._read(schema, parsed);
+      recordSlice("shape_deserialize_ms", performance.now() - t1);
+      return out;
+    }
     return this._read(
       schema,
       typeof data === "string" ? JSON.parse(data, jsonReviver) : await parseJsonBody(data, this.serdeContext!)

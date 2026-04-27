@@ -1,11 +1,14 @@
-import { CreateTableCommand, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import type { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { CreateTableCommand, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
 import { defineSchema } from "../src/schema";
 import { DataMapper } from "../src/table";
 import { userTableSchemaDefinition } from "./user-table-schema";
 
-export const USER_TABLE_NAME = "UserTable";
+/** Override with **`BENCH_DYNAMODB_TABLE`** when targeting a dedicated benchmark table in AWS. */
+export const USER_TABLE_NAME =
+  process.env.BENCH_DYNAMODB_TABLE?.trim() || process.env.DYNAMODB_BENCH_TABLE?.trim() || "UserTable";
 
 export const UserSchema = defineSchema(userTableSchemaDefinition);
 
@@ -35,6 +38,30 @@ export async function ensureUserTable(ddbClient: DynamoDBClient): Promise<void> 
     })
   );
   console.log("Created table:", USER_TABLE_NAME);
+}
+
+export type BenchNetworkKind = "local" | "aws";
+
+/**
+ * Prepares the benchmark table: **`BENCH_ENSURE_TABLE`**
+ *
+ * - **`1`** / **`true`** — create table if missing (same as **`ensureUserTable`**).
+ * - **`0`** / **`false`** — never create; **`DescribeTable`** must succeed (typical for production AWS runs).
+ * - **unset** — **`local`** network defaults to **create-if-missing**; **`aws`** defaults to **verify-only** (no create).
+ */
+export async function ensureBenchTable(ddbClient: DynamoDBClient, network: BenchNetworkKind): Promise<void> {
+  const raw = process.env.BENCH_ENSURE_TABLE?.trim().toLowerCase();
+  let allowCreate: boolean;
+  if (raw === "1" || raw === "true") allowCreate = true;
+  else if (raw === "0" || raw === "false") allowCreate = false;
+  else allowCreate = network === "local";
+
+  if (allowCreate) {
+    await ensureUserTable(ddbClient);
+    return;
+  }
+
+  await ddbClient.send(new DescribeTableCommand({ TableName: USER_TABLE_NAME }));
 }
 
 export function userTableHandle(client: DynamoDBDocumentClient) {

@@ -11,7 +11,7 @@
  * Minimal usage:
  *
  * ```ts
- * const av = userItemToAttributeMap({ pk, sk, userId, profileKey, name, email, version });
+ * const av = userItemToAttributeMap({ pk, sk, userId, profileKey, name, email, body, version });
  * const fakeDdb = buildMeasureOnlySharedDynamoDb(av);
  * const docClient = DynamoDBDocumentClient.from(fakeDdb);
  * ```
@@ -126,6 +126,7 @@ export type UserTableLikeItem = {
   profileKey: string;
   name: string;
   email: string;
+  body: string;
   version: number;
 };
 
@@ -138,6 +139,7 @@ export function userItemToAttributeMap(i: UserTableLikeItem): Record<string, Att
     profileKey: { S: i.profileKey },
     name: { S: i.name },
     email: { S: i.email },
+    body: { S: i.body },
     version: { N: String(i.version) },
   };
 }
