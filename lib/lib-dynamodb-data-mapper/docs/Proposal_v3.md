@@ -12,13 +12,15 @@ This document explains what we plan to ship, where version 1 stops, and how the 
 
 ## Executive summary and decision
 
-We are asking for two decisions. First, endorse a full cross-SDK DynamoDB ODM program: a shared rationale, a published roadmap, and named owners. That program describes how other languages *could* follow the same path; peer teams have expressed willingness to align, but their delivery is not part of this approval. Second, ship Phase 1 for JavaScript and TypeScript as an official, additive, opt-in package in the `@aws-sdk/`* family (working name `@aws-sdk/lib-dynamodb-data-mapper`). That JavaScript work is the committed engineering in this memo. It sits on top of `@aws-sdk/lib-dynamodb` and `DynamoDBDocumentClient` and offers schema-first typed create, read, update, delete, and query, along with helpers for expressions, pagination, and batch or transactional writes. The DynamoDB wire contract does not change. Teams can still call the document client directly whenever they need to.
+We are asking for two decisions. First, endorse a full cross-SDK DynamoDB ODM program: a shared rationale, a published roadmap, and named owners. That program describes how other languages *could* follow the same path; peer teams have expressed willingness to align, but their delivery is not part of this approval. Second, ship Phase 1 for JavaScript and TypeScript as an official, additive, opt-in package in the `@aws-sdk/`* family (working name `@aws-sdk/lib-dynamodb-data-mapper`). That JavaScript work is the committed engineering in this document. It sits on top of `@aws-sdk/lib-dynamodb` and `DynamoDBDocumentClient` and offers schema-first typed create, read, update, delete, and query, along with helpers for expressions, pagination, and batch or transactional writes. The DynamoDB wire contract does not change. Teams can still call the document client directly whenever they need to.
 
 Today many teams live between a verbose low-level client and a document client that has no supported mapping layer. The archived AWS Labs DataMapper left a hole on the v3 line. Community libraries help, but they split the official story. Download and repository signals ([Appendix G](#appendix-g) and [Appendix E](#appendix-e)) show steady demand. Java and .NET already ship first-party elevated clients. A coordinated ODM program across SDKs would give customers, docs, and support one clear path.
 
 TypeScript backends and serverless are now the default for DynamoDB. Developers expect to work with schemas and objects, not only attribute maps. A first-party ODM gives training and enterprise support a single anchor.
 
-Leadership has signaled that the deliverable is a full cross-SDK ODM program: one story for customers, shared principles, and a roadmap other language teams *may* follow. Several peer SDK teams have said they are willing to adopt the same ODM direction once a charter exists; that willingness is not a committed schedule or staffing plan for those languages. This document starts the program definition and commits engineering to the JavaScript document mapper (general availability targeted for September 2026) as the first milestone, not a JavaScript-only experiment. See [Cross-language ODM direction](#cross-language-odm-direction-strategic-alignment).
+We draw on the same product pattern Microsoft uses with **EF Core on Azure Cosmos DB**: an official object-mapping layer for teams that want schemas and entities, with clear store semantics and room to grow over time, without treating the database like a relational engine (see [What EF Core on Cosmos teaches this program](#ef-core-cosmos-precedent)).
+
+Leadership has signaled that the deliverable **could** be a full cross-SDK ODM program: one story for customers, shared principles, and a roadmap other language teams *may* follow if that direction is approved. Several peer SDK teams have said they are willing to adopt the same ODM direction once a charter exists; that willingness is not a committed schedule or staffing plan for those languages. This document proposes that program frame and commits engineering to the JavaScript document mapper (general availability targeted for September 2026) as the first milestone, not a JavaScript-only experiment. See [Cross-language ODM direction](#cross-language-odm-direction-strategic-alignment).
 
 The goal is general availability as first-party `@aws-sdk/`* software with named AWS ownership, support on par with other v3 libraries, and a normal product lifecycle. It is not a Labs-only drop. The first engineering slice is the JavaScript v3 modular line (v2 `aws-sdk` stays legacy). The [cross-language roadmap](#cross-language-odm-direction-strategic-alignment) notes willingness from other languages; it does not schedule their delivery.
 
@@ -28,20 +30,20 @@ The goal is general availability as first-party `@aws-sdk/`* software with named
 
 Earlier drafts of this work read like a **classical DataMapper proposal**. The ask was narrow and familiar: ship one official JavaScript package on SDK v3 that replaces the gap left by the archived Labs DataMapper. Reviewers would judge API shape, version 1 scope, performance, and general availability on a single timeline (May through September 2026). Success meant a supported `@aws-sdk/lib-dynamodb-data-mapper` that teams could adopt instead of community wrappers, with the same stack they already use (`DynamoDBDocumentClient` underneath, escape hatch intact). That body of work is still valid. The package design, tenets, [appendix](#appendix) sketches, and engineering plan for version 1 are largely unchanged.
 
-**This document (Proposal v3) adds a different decision on top of that package.** Leadership is asked to endorse a **full cross-SDK DynamoDB ODM program** as the strategic frame. Peer SDK teams have signaled **willingness** to follow that path; they have not committed dates or resourcing in this memo. The classical proposal answered “what do we ship for JavaScript in 2026?” The ODM program answers “what is AWS’s long-term, multi-language story for schema-driven DynamoDB access, and how could we stage it if other languages join later?”
+**This document (Proposal v3) adds a different decision on top of that package.** Leadership is asked to endorse a **full cross-SDK DynamoDB ODM program** as the strategic frame. Peer SDK teams have signaled **willingness** to follow that path; they have not committed dates or resourcing in this document. The classical proposal answered “what do we ship for JavaScript in 2026?” The ODM program answers “what is AWS’s long-term, multi-language story for schema-driven DynamoDB access, and how could we stage it if other languages join later?”
 
 The table below is the shortest way to see the shift. The rows are about **governance and scope**, not about throwing away the mapper work.
 
 
-| Topic                        | Classical DataMapper proposal                                                                 | ODM program (this proposal)                                                                                                                                       |
-| ---------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **What leadership approves** | One new first-party npm package for JavaScript v3                                             | A cross-SDK program (charter, roadmap, owners, gates) **and** JavaScript Phase 1 as its first deliverable                                                         |
-| **Primary deliverable**      | General availability of `@aws-sdk/lib-dynamodb-data-mapper`                                   | The same GA package **plus** a published multi-language ODM plan customers and other SDKs can follow                                                              |
-| **Languages**                | JavaScript and TypeScript on the v3 modular line only                                         | JavaScript Phase 1 is committed here. Other SDKs: peer **willingness** to follow the ODM path, not committed delivery in this memo                                |
-| **Relation to Java / .NET**  | “Parity in spirit” with Enhanced Client and .NET persistence                                  | Map existing elevated clients to one ODM definition for comparison. Peer **willingness** to follow the path, not joint delivery commitments                       |
-| **Version 1 scope**          | Typed schema, table handle, CRUD/query, helpers (unchanged)                                   | **Same** technical scope for the package. Stages 2 and 3 are directional (JS follow-on and program vision), not other-SDK scope in this approval                  |
-| **How success is measured**  | Package adopted, docs updated, support burden understood                                      | **Committed:** JavaScript package GA. **Program:** charter signed, parity matrix published. Other SDKs: willingness recorded, not preview/GA targets in this memo |
-| **What did not change**      | Additive package, schema-as-code, faithful DynamoDB semantics, [appendix](#appendix) evidence | Unchanged. Phase 1 is still the document mapper described in the rest of this memo                                                                                |
+| Topic                        | Classical DataMapper proposal                                                                 | ODM program (this proposal)                                                                                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **What leadership approves** | One new first-party npm package for JavaScript v3                                             | A cross-SDK program (charter, roadmap, owners, gates) **and** JavaScript Phase 1 as its first deliverable                                                             |
+| **Primary deliverable**      | General availability of `@aws-sdk/lib-dynamodb-data-mapper`                                   | The same GA package **plus** a published multi-language ODM plan customers and other SDKs can follow                                                                  |
+| **Languages**                | JavaScript and TypeScript on the v3 modular line only                                         | JavaScript Phase 1 is committed here. Other SDKs: peer **willingness** to follow the ODM path, not committed delivery in this document                                |
+| **Relation to Java / .NET**  | “Parity in spirit” with Enhanced Client and .NET persistence                                  | Map existing elevated clients to one ODM definition for comparison. Peer **willingness** to follow the path, not joint delivery commitments                           |
+| **Version 1 scope**          | Typed schema, table handle, CRUD/query, helpers (unchanged)                                   | **Same** technical scope for the package. Stages 2 and 3 are directional (JS follow-on and program vision), not other-SDK scope in this approval                      |
+| **How success is measured**  | Package adopted, docs updated, support burden understood                                      | **Committed:** JavaScript package GA. **Program:** charter signed, parity matrix published. Other SDKs: willingness recorded, not preview/GA targets in this document |
+| **What did not change**      | Additive package, schema-as-code, faithful DynamoDB semantics, [appendix](#appendix) evidence | Unchanged. Phase 1 is still the document mapper described in the rest of this document                                                                                |
 
 
 In practice, a reviewer who approved the classical proposal should still recognize the JavaScript package. A reviewer who only sees the ODM program should still understand that **September 2026 GA is concrete engineering**, not a charter exercise. The classical ask is the **first milestone** of the larger program, not a competing idea.
@@ -99,17 +101,17 @@ Early PutItem benchmarks ([Appendix: PoC micro-benchmark](#appendix-poc)) show t
 The table below records the main choices and tradeoffs. Wording is intentional for review. Details sit in the [appendix](#appendix).
 
 
-| Decision         | Choice                                                     | Tradeoff                                                                                                                            |
-| ---------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Delivery         | Additive package, not inside `lib-dynamodb` or codegen     | We own another package, but previews can move quickly and the escape hatch stays obvious                                            |
-| Modeling         | Schema-first primary experience                            | A small upfront schema cost reduces long-term drift                                                                                 |
-| Adoption shape   | Core mapper plus separate helper modules                   | More surfaces to version, but teams can adopt piece by piece                                                                        |
-| v1 breadth       | ODM Phase 1: lightweight document mapper (JavaScript)      | Only committed language work in this memo. [Roadmap](#cross-language-odm-direction-strategic-alignment) shows willingness elsewhere |
-| Deferred scope   | Auto-GSI routing, decorators-first, DAX, table-from-code   | Directional program stages 2–3 on [roadmap](#cross-language-odm-direction-strategic-alignment), not other-SDK commitments           |
-| Expressions      | Minimal builder set in v1                                  | Fewer string bugs without an open-ended expression language in v1                                                                   |
-| Indexes          | Caller supplies `IndexName` and key condition              | Keeps cost and correctness visible to the developer                                                                                 |
-| Schema evolution | Forward-compatible reads by default, strict modes optional | Safer reads. Migration tooling specified before API freeze                                                                          |
-| Versioning       | Same semver rules as other `@aws-sdk/`* packages           | Preview channels and deprecation notices manage churn                                                                               |
+| Decision         | Choice                                                     | Tradeoff                                                                                                                                |
+| ---------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Delivery         | Additive package, not inside `lib-dynamodb` or codegen     | We own another package, but previews can move quickly and the escape hatch stays obvious                                                |
+| Modeling         | Schema-first primary experience                            | A small upfront schema cost reduces long-term drift                                                                                     |
+| Adoption shape   | Core mapper plus separate helper modules                   | More surfaces to version, but teams can adopt piece by piece                                                                            |
+| v1 breadth       | ODM Phase 1: lightweight document mapper (JavaScript)      | Only committed language work in this document. [Roadmap](#cross-language-odm-direction-strategic-alignment) shows willingness elsewhere |
+| Deferred scope   | Auto-GSI routing, decorators-first, DAX, table-from-code   | Directional program stages 2–3 on [roadmap](#cross-language-odm-direction-strategic-alignment), not other-SDK commitments               |
+| Expressions      | Minimal builder set in v1                                  | Fewer string bugs without an open-ended expression language in v1                                                                       |
+| Indexes          | Caller supplies `IndexName` and key condition              | Keeps cost and correctness visible to the developer                                                                                     |
+| Schema evolution | Forward-compatible reads by default, strict modes optional | Safer reads. Migration tooling specified before API freeze                                                                              |
+| Versioning       | Same semver rules as other `@aws-sdk/`* packages           | Preview channels and deprecation notices manage churn                                                                                   |
 
 
 [Appendix K](#appendix-k) ranks building greenfield versus adopting a community library. Greenfield is the default for API control and release clarity. Adopting a library such as Toolbox is worth discussion only if leadership prioritizes time to first preview.
@@ -118,11 +120,11 @@ The table below records the main choices and tradeoffs. Wording is intentional f
 
 ## Cross-language ODM direction (strategic alignment)
 
-A first-party DynamoDB ODM on the official client stack would materially improve how customers build on DynamoDB. The deliverable leadership expects is a full cross-SDK **program definition**: one story in docs and support, shared design principles, and a published roadmap with owners and review gates. This memo asks leadership to endorse that frame and to **fund JavaScript Phase 1** as the only committed engineering in this approval.
+A first-party DynamoDB ODM on the official client stack would materially improve how customers build on DynamoDB. Leadership has indicated the deliverable **could** be a full cross-SDK **program definition**: one story in docs and support, shared design principles, and a published roadmap with owners and review gates. This document asks leadership to endorse that possible frame and to **fund JavaScript Phase 1** as the only committed engineering in this approval.
 
 Several other SDK teams have told us they are **willing** to follow the same ODM path after a charter exists. That is valuable alignment signal. It is **not** a commitment from those teams to ship on our Stage 1 timeline, to enter preview on a fixed date, or to take scope from this repository. Their roadmaps remain their own once the shared definition is published.
 
-Concretely, we need approval for the cross-SDK program (charter, roadmap, owners, gates) and funding for Phase 1, the JavaScript document mapper described in this proposal. Phase 1 is the same kind of product Java and .NET already ship: typed mapping over the service API. Stages 2 and 3 in the table below describe **where the program could go** on JavaScript and **what peer willingness implies** for other languages. They are not bundled delivery promises for other SDKs in this memo.
+Concretely, we need approval for the cross-SDK program (charter, roadmap, owners, gates) and funding for Phase 1, the JavaScript document mapper described in this proposal. Phase 1 is the same kind of product Java and .NET already ship: typed mapping over the service API. Stages 2 and 3 in the table below describe **where the program could go** on JavaScript and **what peer willingness implies** for other languages. They are not bundled delivery promises for other SDKs in this document.
 
 The ODM we mean is official and teachable. Customers get one AWS-supported path for schemas and entities in documentation, training, and enterprise support. It is not another community fragment or a Labs-only experiment.
 
@@ -135,7 +137,7 @@ It stays consistent across languages. Java should not keep an elevated client wh
 **Illustrative program roadmap** (JavaScript Phase 1 dates match [Timeline](#timeline-illustrative). The “Other SDKs” column records **willingness only**, not committed actions or dates.)
 
 
-| Stage                  | Program focus (directional)                                                              | JavaScript v3 (committed in this memo)               | Other SDKs (willingness only, not committed)                                                                                                   |
+| Stage                  | Program focus (directional)                                                              | JavaScript v3 (committed in this document)           | Other SDKs (willingness only, not committed)                                                                                                   |
 | ---------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Stage 0 (charter)      | ODM rationale, API principles, owners, gates                                             | Design alignment (May 2026)                          | Socialize draft ODM definition with peer teams. Map Java Enhanced Client and .NET to the same story for comparison, not delivery.              |
 | Stage 1 (mapper GA)    | Typed CRUD and query, expression helpers, batch chunking                                 | **Committed:** GA targeted September 2026            | Publish parity matrix ([Appendix F](#appendix-f)). Peer teams have expressed willingness to align over time; no other language GA is in scope. |
@@ -143,7 +145,7 @@ It stays consistent across languages. Java should not keep an elevated client wh
 | Stage 3 (ODM advanced) | Richer helpers tied to access patterns, streams, optional codegen (if pursued)           | Expand when evidence and perf CI support it on JS    | Same as Stage 2: willingness to align, not a committed multi-SDK release schedule.                                                             |
 
 
-Leadership should treat the cross-SDK ODM **program definition** as the strategic deliverable, alongside **committed** JavaScript Phase 1 engineering. The sequencing we own in this memo is: lock the charter and roadmap at Stage 0, ship JavaScript general availability at Stage 1 on the schedule in [Timeline](#timeline-illustrative). What happens in other languages afterward depends on those teams, not on this approval.
+If leadership adopts the cross-SDK ODM direction, the strategic deliverable would be that **program definition**, alongside **committed** JavaScript Phase 1 engineering. The sequencing we own in this document is: lock the charter and roadmap at Stage 0, ship JavaScript general availability at Stage 1 on the schedule in [Timeline](#timeline-illustrative). What happens in other languages afterward depends on those teams, not on this approval.
 
 In one sentence: endorse the cross-SDK ODM program (rationale, roadmap, owners), approve **JavaScript Phase 1** as committed work, and treat other languages as willing to follow the path when they choose to staff it.
 
@@ -159,6 +161,34 @@ Some architects worry that a higher-level client will hide partition keys and in
 
 Finally, if ODM is strategic, why phase at all? Phasing separates what we **commit** now (JavaScript Phase 1 plus program charter) from what we **describe** for later (richer ODM on JS, and willingness from other languages to follow the same path). Stage 0 fixes the charter and roadmap. Stage 1 closes the largest gap on JavaScript v3 in 2026. Stages 2 and 3 are directional for the program; other SDKs move only when those teams commit their own plans.
 
+Some reviewers will ask why we do not ship “EF for DynamoDB”. EF Core on Cosmos shows that enterprises adopt a **platform-owned** mapping layer when it matches how they already build. It also shows what goes wrong when teams treat a document store like SQL: LINQ can compile to cross-partition or expensive queries, and request units surprise teams that skip review. Our answer is the same category of product with different store rules: a teachable official default, a thin Phase 1 mapper, and every call still ending on `DynamoDBDocumentClient.send(Command)`.
+
+---
+
+
+
+## What EF Core on Cosmos teaches this program (precedent)
+
+**Entity Framework Core** on **Azure Cosmos DB** is the closest in-house analogue to what we propose for DynamoDB: a first-party object-mapping path on top of a document-oriented API, not a relational database wearing a different connection string. .NET teams use `DbContext`, entity classes, and LINQ; the EF Core Cosmos provider translates those calls into the Cosmos client. That is an **ODM** story, not “SQL Server in the cloud.”
+
+What worked is worth copying. Microsoft gave .NET customers an official, documented way to work with items and containers using skills they already had. Teams that outgrew the abstraction could still use the Cosmos SDK for advanced scenarios. Adoption accelerated where access patterns were simple and partition discipline was enforced in design and review.
+
+What failed when teams ignored store semantics is worth copying too. Convenience turned costly when LINQ produced scans or cross-partition queries that looked innocent in code. Change tracking and a broad EF surface added overhead compared with a thin client path. The lesson is not “do not ship ODM.” The lesson is **ship ODM that keeps partition keys, indexes, and cost visible**, stage depth over time, and preserve an escape hatch.
+
+For DynamoDB, that implies the program we describe in this document: a cross-SDK ODM **definition** leadership **could** adopt, with **committed** JavaScript Phase 1 as a document mapper faithful to access patterns (explicit `IndexName`, key conditions, conditionals). Stages 2 and 3 on the [cross-language roadmap](#cross-language-odm-direction-strategic-alignment) are directional for richer ODM on JavaScript and for how other languages might align if they staff their own work. We are not proposing to clone EF’s breadth or LINQ model on day one.
+
+
+|                               | EF Core + Cosmos DB                   | This program (DynamoDB ODM)                                                                |
+| ----------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Official stack                | EF Core provider on Cosmos (.NET)     | `@aws-sdk/`* document mapper (Phase 1, JavaScript)                                         |
+| Day-one breadth               | Broad EF surface (with provider gaps) | Narrow mapper; later program stages are directional                                        |
+| Partition and cost visibility | Easy to obscure behind LINQ           | Keys, index name, and conditionals stay explicit in API and docs                           |
+| Escape hatch                  | Cosmos SDK                            | `DynamoDBDocumentClient.send(Command)`                                                     |
+| Cross-language                | Centered on .NET                      | Program frame; JavaScript committed; other SDKs willing to align, not committed to deliver |
+
+
+This precedent supports endorsing ODM as a strategic direction. It does not require matching EF feature-for-feature in September 2026. It requires the same discipline: official teachability, staged delivery, and respect for how the underlying service bills and scales.
+
 ---
 
 ## V1 scope
@@ -171,7 +201,7 @@ TTL, conditionals, transactions, and raw batch APIs remain available through the
 
 Automatic GSI routing, prescribed single-table frameworks, creating tables from application code, bundling DAX, a decorator-first API, a Labs compatibility shim, and streams mapping are out of scope for this package. They belong to ODM stages 2 and 3 on the [cross-language roadmap](#cross-language-odm-direction-strategic-alignment). That is a schedule choice, not a rejection of the ideas.
 
-This package is ODM Phase 1 for JavaScript inside the cross-SDK program frame. Stages 2 and 3 describe possible follow-on scope on JavaScript and how other teams might align; they are not committed multi-SDK delivery in this memo. API illustrations are in [Appendix A](#appendix-a) through [Appendix C](#appendix-c).
+This package is ODM Phase 1 for JavaScript inside the cross-SDK program frame. Stages 2 and 3 describe possible follow-on scope on JavaScript and how other teams might align; they are not committed multi-SDK delivery in this document. API illustrations are in [Appendix A](#appendix-a) through [Appendix C](#appendix-c).
 
 ---
 
@@ -227,7 +257,7 @@ This work is not gated on other Foundation proposals in this repository.
 
 **Contents:** [A](#appendix-a) · [B](#appendix-b) · [C](#appendix-c) · [D](#appendix-d) · [E](#appendix-e) · [F](#appendix-f) · [G](#appendix-g) · [H](#appendix-h) · [J](#appendix-j) · [K](#appendix-k) · [PoC](#appendix-poc) · [Program plan](#appendix-program-plan)
 
-<a id="appendix-a"></a>
+
 
 ### A. Architecture (illustrative)
 
@@ -274,7 +304,7 @@ The mapper sits above the document client. The generated clients stay unchanged;
 
 For a full, end-to-end typed example (schema definition plus put, get, update, delete, and query), see [Appendix C](#appendix-c) (Core mapper).
 
-<a id="appendix-b"></a>
+
 
 ### B. Typings (illustrative)
 
@@ -371,7 +401,7 @@ declare const DataMapper: {
 };
 ```
 
-<a id="appendix-c"></a>
+
 
 ### C. API surface (illustrative)
 
@@ -450,21 +480,25 @@ await transactWriteChunks(docClient, [
 ]);
 ```
 
-<a id="appendix-d"></a>
+
 
 ### D. Further reading
 
-Public signals cited in the problem statement (npm downloads, GitHub code search counts, sentiment corpus size) are documented in the narrative, in [Appendix G](#appendix-g) for download ratios and community-wrapper totals, in [Appendix H](#appendix-h) for a community-vs-proposed-mapper comparison matrix, in [Appendix F](#appendix-f) (Java vs proposed JS) for Java Enhanced Client concept mapping, and in [Appendix E](#appendix-e) for the sentiment JSON bundle.
+Public signals cited in the problem statement (npm downloads, GitHub code search counts, sentiment corpus size) are documented in the narrative, in [Appendix G](#appendix-g) for download ratios and community-wrapper totals, in [Appendix H](#appendix-h) for a community-vs-proposed-mapper comparison matrix, in [Appendix F](#appendix-f) for Java Enhanced Client and EF Core on Cosmos implementation comparators, and in [Appendix E](#appendix-e) for the sentiment JSON bundle.
 
-<a id="appendix-e"></a>
+
 
 ### E. Companion sentiment bundle
 
 Full JSON corpus and headline sentiment link.
 
-<a id="appendix-f"></a>
 
-### F. Schema functions over decorators
+
+### F. Schema functions over decorators, comparators, and EF-on-Cosmos implementation patterns
+
+This appendix supports the main narrative on schema modeling ([What EF Core on Cosmos teaches this program](#ef-core-cosmos-precedent)) with feature-level and implementation-level detail.
+
+#### Schema functions over decorators
 
 TypeScript decorators are usually the wrong default for a DynamoDB mapper in the JS/TS SDK for a few practical reasons:
 
@@ -492,7 +526,61 @@ References: gist.github.com/lucianlature-endava/bcecc19ce515e4c0fd428cd4c37c7b9e
 | Schema reuse / inheritance       | Class extension + annotations               | Composition: share attributes / index fragments as plain objects                                  |
 
 
-<a id="appendix-g"></a>
+#### EF Core on Cosmos: features and implementation patterns
+
+**Entity Framework Core** with the **Azure Cosmos DB** provider is the closest in-house analogue to a platform-owned ODM on a document API. The provider maps `DbContext`, entity types, and LINQ to items in containers. It is not a relational EF provider. The useful lessons for this proposal are **how mapping is implemented**, not copying LINQ or full EF breadth into JavaScript on day one.
+
+**Metadata-first model.** EF builds a model at startup: container, partition key path, key properties, concurrency token, and property-to-JSON mapping. The proposed mapper does the same with `defineSchema({ attributes, indexes })` compiled to an internal table model (primary and secondary index legs, version field, attribute types). No reflection or decorator requirement is needed for Phase 1.
+
+**Command pipeline.** EF tracks entity state, builds provider requests, and executes against Cosmos. The proposed path is explicit: validate the application row against the schema, map to document-client attribute shapes, build `PutItem` / `GetItem` / `UpdateItem` / `DeleteItem` / `Query` commands, then `DynamoDBDocumentClient.send(Command)`. Phase 1 does **not** include an EF-style change tracker that turns dirty objects into hidden updates.
+
+**Partition key discipline.** EF requires partition key metadata on entities and uses it on create and partition-scoped reads. Phase 1 requires complete key material for the declared partition key (and sort key when modeled) on every keyed operation. Queries must supply a typed key condition that includes the partition leg. There is no table-scan helper in v1.
+
+**Optimistic concurrency.** EF maps Cosmos **ETag** to a concurrency token; conflicting saves surface as `DbUpdateConcurrencyException`. Phase 1 maps a declared `versionAttribute` on the schema to conditional writes on update (and optionally on delete). Mapper validation errors stay separate from DynamoDB conditional check failures.
+
+**Updates: partial by intent.** EF can emit partial patches when change tracking marks dirty properties; blind full-document replace is a common foot-gun under RU billing. Phase 1 favors explicit partial updates through condition and update builders; full replace remains available when the caller chooses it, not as a hidden default.
+
+**Hooks, not silent tracking.** EF `SaveChanges` integrates change tracking by default. For Cosmos, that pattern often produces surprise queries or patches. Phase 1 offers optional lifecycle hooks (for example `beforePut`) and explicit `put` / `update` / `delete` calls instead of implicit dirty tracking. Light change tracking, if ever added, belongs on the directional program roadmap, not in the committed September 2026 slice.
+
+**Escape hatch tiers.** EF teams drop to the Cosmos SDK or raw SQL for advanced scenarios. Customer documentation for this mapper should mirror that story: typed table handle first, same `DynamoDBDocumentClient` instance for advanced commands, then `@aws-sdk/client-dynamodb` when required.
+
+**EF Core on Cosmos vs proposed JS mapper (implementation)**
+
+
+| Feature / purpose               | EF Core + Cosmos DB                                      | Proposed JS SDK v3 DataMapper (Phase 1)                                 |
+| ------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Model definition                | Fluent API / attributes on entity classes                | `defineSchema({ attributes, indexes })` (plain objects, inferred types) |
+| Container / table binding       | Entity type → Cosmos container                           | `DataMapper.forTable(tableName, schema, { client })`                    |
+| Partition key                   | Required metadata; `WithPartitionKey` for scoped queries | `indexes.primary.pk`; required key material on writes and queries       |
+| Sort key                        | Modeled on entity                                        | `indexes.primary.sk` when table uses composite primary key              |
+| Nested document fields          | Owned entity types embedded in JSON                      | v1 scalar-first; nested maps/lists deepen in preview / Stage 2          |
+| Create / read / update / delete | `DbSet`, LINQ, `SaveChanges`                             | Explicit `put`, `get`, `update`, `delete`, `query` on table handle      |
+| Query composition               | LINQ translated to Cosmos SQL (cross-partition risk)     | Caller supplies `IndexName` and key condition; no LINQ in v1            |
+| Optimistic concurrency          | ETag as concurrency token                                | `versionAttribute` → conditional expressions                            |
+| Change tracking                 | Built into `DbContext`                                   | **None in v1**; explicit operations and optional hooks                  |
+| Batch / transactional writes    | Provider and SDK features                                | Chunking helpers to service limits (v1 intent)                          |
+| Diagnostics                     | EF logging, interceptors, diagnostics                    | Optional injection hooks; caller-owned telemetry                        |
+| Raw / advanced access           | Cosmos SDK, SQL API                                      | Same `DynamoDBDocumentClient.send(Command)` and low-level client        |
+
+
+**Mapping EF ideas to program phases**
+
+
+| EF-on-Cosmos idea               | Phase 1 (committed) | Stages 2–3 (directional)                             |
+| ------------------------------- | ------------------- | ---------------------------------------------------- |
+| Metadata-first keys and version | Yes                 | Stricter schema modes, shared error taxonomy         |
+| Explicit command pipeline       | Yes                 | Typed batch helpers per entity                       |
+| Partition-scoped queries        | Yes                 | Dev-time warnings for weak key conditions (optional) |
+| Owned / nested JSON shapes      | Scalars only in v1  | Nested attributes, value converters                  |
+| Change tracking / dirty patches | **No**              | Only if evidence supports explicit opt-in API        |
+| LINQ-style ad hoc query         | **No**              | **No** (access-pattern–faithful query only)          |
+| Global soft-delete filters      | **No**              | Opt-in query filters on schema                       |
+| Interceptors                    | Hooks only          | Richer before/after `send` middleware                |
+
+
+**Explicit non-goals carried over from EF lessons:** migrations or DDL from application code; relationship fix-up; lazy loading; implicit index or partition inference; cross-partition joins. Those are out of scope for the same reasons they are hazardous on Cosmos under EF.
+
+
 
 ### G. npm download volume and community-wrapper demand
 
@@ -527,7 +615,7 @@ That total is ~~14.8% of estimated client-dynamodb users and ~24.3% of estimated
 
 **Notes:** The archived Labs DataMapper still sees ~115K/month with no first-party v3 successor. DataMapper’s share of v2 rose from 0.24% (2024) to 0.31% (2025) while v2 declined.
 
-<a id="appendix-h"></a>
+
 
 ### H. Community libraries vs proposed first-party mapper (illustrative matrix)
 
@@ -545,7 +633,7 @@ That total is ~~14.8% of estimated client-dynamodb users and ~24.3% of estimated
 
 Why this does not dismiss community libraries: ElectroDB, DynamoDB-Toolbox, Dynamoose, and others earned their download share. The investment case is reduce fragmentation of the official story, give enterprises a supportable default, and keep advanced modeling in the ecosystem for teams that need it.
 
-<a id="appendix-k"></a>
+
 
 ### K. Acquisition alternatives (adaptation to document client and @aws-sdk/*)
 
@@ -580,7 +668,7 @@ This appendix answers: for a hypothetical acquisition (AWS buys a library instea
 
 **K.4 Deep comparison axes**
 
-- **Integration with the memo’s wire stack** — Toolbox expects the same peer packages and command-first examples. ElectroDB officially documents v3 with `DynamoDBClient`; an acquisition program needs a supported `DynamoDBDocumentClient` matrix. Dynamoose is closest to the low-level client service class, not `DynamoDBDocumentClient` as the primary abstraction in this memo.
+- **Integration with the document’s wire stack** — Toolbox expects the same peer packages and command-first examples. ElectroDB officially documents v3 with `DynamoDBClient`; an acquisition program needs a supported `DynamoDBDocumentClient` matrix. Dynamoose is closest to the low-level client service class, not `DynamoDBDocumentClient` as the primary abstraction in this document.
 - **50/50 single-table vs multi-table** — ElectroDB markets single-table design; Toolbox and Dynamoose are more table-centric / neutral for multi-table teams.
 - **Learning curve** — Toolbox rewards strict TypeScript; ElectroDB adds access-pattern vocabulary; Dynamoose is gentle for Mongoose immigrants.
 - **Could AWS ship it as @aws-sdk/*?** — Toolbox: fewest architectural surprises when renamed and in-tree. ElectroDB: ship-able with program cost to neutralize positioning and formalize DocumentClient. Dynamoose: ship-able only with heavy engineering toward command-centric paths.
@@ -601,9 +689,9 @@ This appendix answers: for a hypothetical acquisition (AWS buys a library instea
 
 **K.6 Decision pull-through**
 
-Default program: **greenfield** aligned to this memo’s reference design (max API control, IP/release clarity, v3 tenets). Acquisition-style paths (e.g. Toolbox) deserve review only if leadership prioritizes time-to-first-supported-release and accepts license, renaming, API subsetting, and long-term maintenance of concepts AWS did not originate. Rebranding a third-party library as `@aws-sdk/`* requires legal, OSS compliance, and product sign-off on roadmap ownership, breaking-change policy, and support liability.
+Default program: **greenfield** aligned to this document’s reference design (max API control, IP/release clarity, v3 tenets). Acquisition-style paths (e.g. Toolbox) deserve review only if leadership prioritizes time-to-first-supported-release and accepts license, renaming, API subsetting, and long-term maintenance of concepts AWS did not originate. Rebranding a third-party library as `@aws-sdk/`* requires legal, OSS compliance, and product sign-off on roadmap ownership, breaking-change policy, and support liability.
 
-<a id="appendix-poc"></a>
+
 
 ### PoC micro-benchmark
 
@@ -613,11 +701,11 @@ Each Lambda runs a time-bounded PutItem-only phase: one untimed primer, then war
 
 **Representative result (eu-west-1, Size=Small, Platform=lambda):** raw ≈ 4.8 ms; ElectroDB ≈ 4.9 ms (~~+2% vs raw); DynamoDB Toolbox ≈ 5.2 ms (~~+8% vs raw); Dynamoose ≈ 6.3 ms (~+31% vs raw). Service-side time is effectively constant across stacks (except Dynamoose’s bridge path); ordering reflects client-side mapping cost. Full methodology in the [PoC micro-benchmark](#appendix-poc) appendix source.
 
-<a id="appendix-program-plan"></a>
+
 
 ### Program plan (product engineering)
 
-For AWS program leadership (quarterly planning, resourcing, go/no-go gates). Scope: **cross-SDK ODM program** governance (charter and roadmap only) plus **committed JavaScript Phase 0–5** (design through GA, automated tests, developer documentation, perf CI gates). Other languages are out of scope for resourcing in this plan except as willingness noted in the main memo. Not gated on other Foundation proposals in this repository.
+For AWS program leadership (quarterly planning, resourcing, go/no-go gates). Scope: **cross-SDK ODM program** governance (charter and roadmap only) plus **committed JavaScript Phase 0–5** (design through GA, automated tests, developer documentation, perf CI gates). Other languages are out of scope for resourcing in this plan except as willingness noted in the main document. Not gated on other Foundation proposals in this repository.
 
 **Calendar anchor:** Program start **1 May 2026**; GA target **end of September 2026** (21 weeks engineering + buffer). Dates are planning baselines until staffing and formal gates are recorded.
 
@@ -658,7 +746,7 @@ For AWS program leadership (quarterly planning, resourcing, go/no-go gates). Sco
 | Preview API churn burns early adopters                         | Medium     | High   | Strict semver for preview channels; clear deprecation notes   |
 
 
-<a id="appendix-j"></a>
+
 
 ### J. Estimation and priority labels
 
