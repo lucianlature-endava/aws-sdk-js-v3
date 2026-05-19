@@ -5,7 +5,9 @@
 **Document phase:** Review ready v2.0 (proposal body). Technical detail is in the [Appendix](#appendix) and is excluded from the page count.
 
 **Owners**: Lucian Lature / Endava Team
+
 **Primary reviewers**: DDB Service Team
+
 **Secondary reviewers**: AWS SDK Team
 
 This document explains what we plan to ship, where version 1 stops, and how the work is staged. It also covers how we will respond to the concerns reviewers usually raise about API stability, bundle size, performance, operational safety, and coexistence with community libraries. Evidence, API sketches, benchmarks, community comparisons, and the full program plan are in the [Appendix](#appendix) and are not repeated here.
