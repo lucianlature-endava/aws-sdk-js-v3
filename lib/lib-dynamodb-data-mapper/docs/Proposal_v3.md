@@ -57,16 +57,6 @@ Shared domain: `Order` with `OrderItem[]` in table `app`.
 
 Community libraries remain valid where teams want stronger opinions ([Appendix H](#appendix-h)). AWS documentation should describe this package as the **official Data Mapper** on `@aws-sdk/*`, not as a Dynamoose replacement.
 
-### Questions we expect in review
-
-**Why not ship a document-ODM instead?** DynamoDB rewards access-pattern-first design. Hiding PK/SK and item collections behind model sugar has repeatedly led to cost and scale surprises. Customers who liked Labs DataMapper liked it because it stayed close to Dynamo, not because it felt like Mongoose.
-
-**Isn’t “ODM” the right name for DynamoDB?** In the broader industry, ODM means object–**document** mapping (MongoDB, CouchDB). On DynamoDB, AWS and practitioners have used **Data Mapper** for the thin, Dynamo-aware layer. We align naming and API with that lineage.
-
-**Does JavaScript lag behind Java?** Java’s Enhanced Client is a separate layer on the Java v2 SDK. Parity means the same *kind* of official elevation: schema-first typed mapping over the wire API. [Appendix F](#appendix-f) maps Enhanced Client concepts to the proposed API.
-
-**Will this hide keys and encourage bad table design?** No. Callers supply `IndexName`, key conditions, and condition expressions. Capacity behavior is unchanged.
-
 ---
 
 ## Problem
