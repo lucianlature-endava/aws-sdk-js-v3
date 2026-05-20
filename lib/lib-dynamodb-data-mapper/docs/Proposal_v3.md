@@ -16,11 +16,11 @@ This document is a high-level design for a first-party **Data Mapper** on AWS SD
 
 **In one line:** we recommend funding and shipping `@aws-sdk/lib-dynamodb-data-mapper` on the v3 modular line as the official **Data Mapper**, not a phased “mapper now, ODM later” program, with implementation starting **1 June 2026** and general availability targeted for **30 September 2026** ([Timeline](#timeline-illustrative)).
 
-**Decision requested:** approve engineering and product commitment for that package: named AWS ownership after GA, support on par with other `@aws-sdk/*` libraries, and delivery through preview, API freeze, and GA on the v3 stack (`DynamoDBDocumentClient` underneath and the escape hatch unchanged).
+**Decision requested:** approve engineering and product commitment for that package: named AWS ownership after GA, support on par with other `@aws-sdk/`* libraries, and delivery through preview, API freeze, and GA on the v3 stack (`DynamoDBDocumentClient` underneath and the escape hatch unchanged).
 
 **What we ship:** schema-first typed **get, put, update, delete, and query** (partition-scoped **Query** on the base table and named GSI/LSI, not **Scan**). **One table per** `forTable` handle (no multi-table registry or cross-table orchestration in v1). Helpers for **Key, Condition, and Update** expressions, pagination, and batch/transact chunking. Schema-driven **optimistic locking** and optional **lifecycle hooks**. Mapper validation errors are separate from DynamoDB service errors. Application types stay persistence-ignorant with explicit keys and indexes. No DynamoDB service API changes.
 
-**Why Data Mapper, not document-ODM:** on DynamoDB, both labels often mean "object to item mapping", but the implementations diverge. A **Data Mapper** (AWS Labs lineage, Java Enhanced Client in spirit) keeps you in the Dynamo mental model: composite keys, item collections, single-table patterns you design and code. A **document-ODM** (Dynamoose, Nova ODM, and similar) favors one document per aggregate, model `get`/`save`, and configuration that can hide PK/SK. That is workable for simple shapes but misaligned with access-pattern-driven and single-table design. We recommend the former for the first-party package ([Recommendation](#recommendation-data-mapper-not-document-odm)). Other languages already ship their own elevated clients. **This HLD covers JavaScript only.**
+**Why Data Mapper, not document-ODM:** DynamoDB is key-value first. Mis-modeling is the bigger risk than SDK boilerplate. We recommend a Dynamo-centric **Data Mapper** (explicit keys and layout), not a document-ODM that “Mongo-ifies” the service ([Recommendation](#recommendation-data-mapper-not-document-odm)). Other languages already ship their own elevated clients. **This HLD covers JavaScript only.**
 
 ---
 
@@ -28,22 +28,30 @@ This document is a high-level design for a first-party **Data Mapper** on AWS SD
 
 This document defines **one deliverable**: `@aws-sdk/lib-dynamodb-data-mapper` (final name TBD) for TypeScript and JavaScript on `@aws-sdk/lib-dynamodb`. It specifies version 1 scope, design tenets, delivery phases, and review answers.
 
-Success for this HLD means: package GA on npm under `@aws-sdk/*`, documentation and examples that teach **Data Mapper** usage on DynamoDB, performance and API gates met, and a clear line against positioning the product as a Mongo-style ODM.
+Success for this HLD means: package GA on npm under `@aws-sdk/`*, documentation and examples that teach **Data Mapper** usage on DynamoDB, performance and API gates met, and a clear line against positioning the product as a Mongo-style ODM.
 
----
 
-<a id="recommendation-data-mapper-not-document-odm"></a>
 
 ## Recommendation: Data Mapper, not document-ODM
 
 Two orthogonal ideas often get conflated:
+
 
 | Axis                              | What it means                                                                                                                                                                                                                                                           |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Pattern (coupling)**            | **Data Mapper:** domain objects are persistence-ignorant. A separate mapper/repository layer translates to and from the store. **Active Record / model-centric:** persistence methods live on the model (`OrderModel.get`, `doc.save`).                                 |
 | **Modeling (Dynamo vs document)** | **Dynamo-centric mapper:** you design PK/SK, GSIs, and item types. The library marshals and types commands. **Document-centric ODM:** you define a schema as one item with nested fields. The library may hide how that maps to partitions and multiple physical items. |
 
-For DynamoDB, **we recommend the Data Mapper pattern with Dynamo-centric modeling**. That is the same product category as the archived Labs DataMapper and the direction implied by the Java Enhanced Client (typed mapping over the service API, not a document store pretending to be MongoDB).
+
+### Why a Data Mapper, not an ODM
+
+DynamoDB is **key-value first, document second**. Its document story is essentially that a value can be a JSON-like blob and the service offers projection APIs. The primary abstraction is partition and sort keys, and item collections within a partition.
+
+**ODM** abstractions are database-agnostic document metaphors. They were designed for systems where one document equals one aggregate (MongoDB, DocumentDB). They are a poor default for single-table, multi-entity layouts keyed by access patterns.
+
+With DynamoDB, the main risk is **mis-modeling**, not syntax verbosity. AWS and community guidance stress single-table design and access patterns. The costliest failures usually come from applying relational or document-database habits, not from hand-writing a bit of SDK code.
+
+Therefore a **Data Mapper** (Labs DataMapper, DynamoDB Toolbox, this proposal) that keeps keys and physical layout explicit is a better fit than an ODM that tries to “Mongo-ify” DynamoDB. **We recommend that pattern with Dynamo-centric modeling** for the first-party package: the same product category as the archived Labs DataMapper and the direction implied by the Java Enhanced Client (typed mapping over the service API, not a document store pretending to be MongoDB).
 
 ### Single-table example: why the choice matters
 
@@ -51,11 +59,11 @@ Shared domain: `Order` with `OrderItem[]` in table `app`.
 
 **Data Mapper (what we propose):** `Order` / `OrderItem` stay domain-only. Persistence uses `OrderMetaRecord` and `OrderItemRecord` (or equivalent schema rows) with `PK = ORDER#<orderId>`, `SK = META` vs `SK = ITEM#<lineNumber>`, and GSI keys for customer listing. `save` writes META plus N item rows. `getById` queries the partition and reassembles the aggregate. Single-table design stays **visible** in code.
 
-**Document-ODM (what we do not propose):** `OrderModel` with hash key `id` and nested `items[]`. `OrderModel.get(id)` and `doc.save()`. Ergonomic for Mongo-shaped mental models. it does **not** naturally express “one aggregate, multiple item types, same PK”, teams either denormalize into one fat item or fight the library.
+**Document-ODM (what we do not propose):** `OrderModel` with hash key `id` and nested `items[]`. `OrderModel.get(id)` and `doc.save()`. Ergonomic for Mongo-shaped mental models. It does **not** naturally express “one aggregate, multiple item types, same PK”. Teams either denormalize into one fat item or fight the library.
 
 > In the Data Mapper version, the code makes single-table design explicit: `Order` maps to META + ITEM#n rows sharing a PK. In the document-ODM version, DynamoDB is treated as a document collection and composite key discipline is easy to lose.
 
-Community libraries remain valid where teams want stronger opinions ([Appendix H](#appendix-h)). AWS documentation should describe this package as the **official Data Mapper** on `@aws-sdk/*`, not as a Dynamoose replacement.
+Community libraries remain valid where teams want stronger opinions ([Appendix H](#appendix-h)). AWS documentation should describe this package as the **official Data Mapper** on `@aws-sdk/`*, not as a Dynamoose replacement.
 
 ---
 
@@ -69,7 +77,7 @@ A single hand-built `UpdateCommand` on the document client is fine. At scale, co
 
 ---
 
-## Tenets (fixed for review and delivery)
+## Tenets
 
 The package is additive. It sits on the stack customers already use, adoption is opt-in, and teams can drop down to `DynamoDBDocumentClient` or `@aws-sdk/client-dynamodb` at any time.
 
@@ -93,12 +101,14 @@ Developers define a schema and bind **one DynamoDB table** with `DataMapper.forT
 
 **Schema-driven write/read behaviour (v1 intent):**
 
+
 | Capability                                              | What it means in v1                                                                                                                                                                                                                                                    |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Optimistic locking**                                  | A numeric attribute marked `versionAttribute: true` on the schema drives conditional updates/deletes (mapper maps to DynamoDB condition expressions).                                                                                                                  |
 | **Lifecycle hooks**                                     | Optional callbacks on write paths (for example `beforePut`) to validate or adjust the row before marshalling, **not** change tracking or implicit dirty-state saves.                                                                                                   |
 | **Update behaviour**                                    | Explicit partial updates (SET / ADD / REMOVE style) via the table handle and Update-expression helpers. No hidden full-item replace unless the caller chooses it.                                                                                                      |
 | **Atomic counters, auto timestamps, custom converters** | Under design for preview/GA where they fit the schema model (for example increment-on-write, `createdAt`/`updatedAt` defaults, custom attribute ↔ stored-type mapping). Exact API is not frozen in this HLD. They are not required for the first private preview gate. |
+
 
 **Expression helpers:** DynamoDB uses four expression families, **Key** (query key conditions), **Condition** (conditional puts/updates/deletes), **Update** (partial item updates), and **Projection** (subset of attributes on reads). v1 targets typed builders for **Key, Condition, and Update** (see modular helpers in [Appendix C](#appendix-c)). **Projection** stays caller-driven or document-client-native in v1 unless preview feedback prioritizes a typed projection builder.
 
@@ -181,11 +191,12 @@ There are no DynamoDB service API changes. All work is client-side. Security and
 
 ---
 
-<a id="timeline-illustrative"></a>
+
 
 ## Timeline (illustrative)
 
 **Program start:** **1 June 2026** (implementation and Phase 0). **GA target:** **30 September 2026**. Dates below are planning ECDs from that anchor. Formal go/no-go gates may shift individual milestones. Surface-to-phase mapping and risks are in [Appendix: Program plan](#appendix-program-plan) and [Appendix J](#appendix-j).
+
 
 | Phase  | What we build (technical)                                                                                                                                            | Duration (weeks) | ECD        |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------- |
@@ -195,13 +206,14 @@ There are no DynamoDB service API changes. All work is client-side. Security and
 | 3      | **Wider preview:** expression/condition builders, pagination, batch/transact chunking, explicit GSI/LSI query, docs + samples                                        | 4                | 6 Sep '26  |
 | 4      | **Release candidate:** API freeze, migration guide from Labs DataMapper / community libs, error taxonomy frozen (overlaps late Phase 3 where possible)               | 2                | 20 Sep '26 |
 | Buffer | Calendar buffer (release train, review slip)                                                                                                                         | 1                | 27 Sep '26 |
-| 5      | **General availability:** named AWS owner, support runbooks, semver on normal `@aws-sdk/*` cadence                                                                   | 1                | 30 Sep '26 |
+| 5      | **General availability:** named AWS owner, support runbooks, semver on normal `@aws-sdk/`* cadence                                                                   | 1                | 30 Sep '26 |
+
 
 **17 weeks** from **1 June** to **30 September**. RC may run in parallel with late preview work. Between private preview and GA, most calendar time is hardening, documentation, perf gates, and review, not net-new surface area.
 
 ---
 
-<a id="appendix"></a>
+
 
 ## Appendix
 
@@ -210,8 +222,6 @@ There are no DynamoDB service API changes. All work is client-side. Security and
 **Contents:** [A](#appendix-a) · [B](#appendix-b) · [C](#appendix-c) · [D](#appendix-d) · [E](#appendix-e) · [F](#appendix-f) · [G](#appendix-g) · [H](#appendix-h) · [J](#appendix-j) · [K](#appendix-k) · [PoC](#appendix-poc) · [Program plan](#appendix-program-plan)
 
 
-
-<a id="appendix-a"></a>
 
 ### A. Architecture (illustrative)
 
@@ -259,8 +269,6 @@ The mapper sits above the document client. The generated clients stay unchanged.
 For a full, end-to-end typed example (schema definition plus put, get, update, delete, and query), see [Appendix C](#appendix-c) (Core mapper).
 
 
-
-<a id="appendix-b"></a>
 
 ### B. Typings (illustrative)
 
@@ -359,8 +367,6 @@ declare const DataMapper: {
 
 
 
-<a id="appendix-c"></a>
-
 ### C. API surface (illustrative)
 
 The following sketches illustrate style only. names, paths, and signatures may differ at ship time. Part one focuses on the core mapper (`defineSchema`, `DataMapper.forTable`, typed table operations). Part two shows how modular helpers might appear as separate imports (subpackages or stable subpath exports under one umbrella) for teams that want building blocks without adopting the full table abstraction.
@@ -440,23 +446,17 @@ await transactWriteChunks(docClient, [
 
 
 
-<a id="appendix-d"></a>
-
 ### D. Further reading
 
 Public signals cited in the problem statement (npm downloads, GitHub code search counts, sentiment corpus size) are documented in the narrative, in [Appendix G](#appendix-g) for download ratios and community-wrapper totals, in [Appendix H](#appendix-h) for a community-vs-proposed-mapper comparison matrix, in [Appendix F](#appendix-f) for the Java Enhanced Client comparator, and in [Appendix E](#appendix-e) for the sentiment JSON bundle.
 
 
 
-<a id="appendix-e"></a>
-
 ### E. Companion sentiment bundle
 
 Full JSON corpus and headline sentiment [link](https://gist.github.com/lucianlature-endava/98e5058ee7b549d283a505eae64e647e).
 
 
-
-<a id="appendix-f"></a>
 
 ### F. Schema functions over decorators and Java comparator
 
@@ -491,7 +491,6 @@ References: gist.github.com/lucianlature-endava/bcecc19ce515e4c0fd428cd4c37c7b9e
 
 
 
-<a id="appendix-g"></a>
 
 ### G. npm download volume and community-wrapper demand
 
@@ -505,7 +504,7 @@ The naïve ratio (DataMapper against the entire aws-sdk v2 package) is misleadin
 | March 2026   | 115K / month  | 41M / month  | 0.28% |
 
 
-**DynamoDB-only v3 clients (closer comparison):** archived DataMapper pulls (~115K/month) vs `@aws-sdk/client-dynamodb` (~26M/month) and `@aws-sdk/lib-dynamodb` (~16M/month) → ~0.44% and ~0.73% respectively.
+**DynamoDB-only v3 clients (closer comparison):** archived DataMapper pulls (~~115K/month) vs `@aws-sdk/client-dynamodb` (~~26M/month) and `@aws-sdk/lib-dynamodb` (~16M/month) → ~0.44% and ~0.73% respectively.
 
 **Total higher-level abstraction demand (March 2026, npm):**
 
@@ -522,13 +521,11 @@ The naïve ratio (DataMapper against the entire aws-sdk v2 package) is misleadin
 | **Total**                  | **3,861,894**                |       |
 
 
-That total is ~14.8% of estimated client-dynamodb users and ~24.3% of estimated lib-dynamodb users (~one in four lib-dynamodb installs alongside a community higher-level wrapper).
+That total is ~~14.8% of estimated client-dynamodb users and ~24.3% of estimated lib-dynamodb users (~~one in four lib-dynamodb installs alongside a community higher-level wrapper).
 
-**Notes:** The archived Labs DataMapper still sees ~115K/month with no first-party v3 successor. DataMapper’s share of v2 rose from 0.24% (2024) to 0.31% (2025) while v2 declined. Qualitative input from the SDK team aligns with that picture: customers who adopted DataMapper on v2 were generally happy with it. The gap is the missing **v3** successor on `@aws-sdk/*`, not lack of appetite for a mapper.
+**Notes:** The archived Labs DataMapper still sees ~115K/month with no first-party v3 successor. DataMapper’s share of v2 rose from 0.24% (2024) to 0.31% (2025) while v2 declined. Qualitative input from the SDK team aligns with that picture: customers who adopted DataMapper on v2 were generally happy with it. The gap is the missing **v3** successor on `@aws-sdk/`*, not lack of appetite for a mapper.
 
 
-
-<a id="appendix-h"></a>
 
 ### H. Community libraries vs proposed first-party mapper (illustrative matrix)
 
@@ -547,8 +544,6 @@ That total is ~14.8% of estimated client-dynamodb users and ~24.3% of estimated 
 Why this does not dismiss community libraries: ElectroDB, DynamoDB-Toolbox, Dynamoose, and others earned their download share. The investment case is reduce fragmentation of the official story, give enterprises a supportable default, and keep advanced modeling in the ecosystem for teams that need it.
 
 
-
-<a id="appendix-k"></a>
 
 ### K. Acquisition alternatives (adaptation to document client and @aws-sdk/*)
 
@@ -608,19 +603,15 @@ Default program: **greenfield** aligned to this document’s reference design (m
 
 
 
-<a id="appendix-poc"></a>
-
 ### PoC micro-benchmark
 
 We evaluated four DynamoDB access layers (raw AWS SDK v3 `DynamoDBDocumentClient`, DynamoDB Toolbox, ElectroDB, and Dynamoose) against a single DynamoDB table with a fixed pk/sk key schema and a shared item shape. Each stack runs in its own AWS Lambda (`CSM_aws-sdk-js-v3_StackBenchPut_{raw,toolbox,electrodb,dynamoose}`, Node.js 20.x, 4096 MB, 900s timeout). The four Lambdas are invoked sequentially so stack timings are isolated.
 
 Each Lambda runs a time-bounded PutItem-only phase: one untimed primer, then warmup puts, then measured puts. The loop is strictly sequential (one `await` per iteration). Keys spread across 16 shards by default to avoid hot-partition throttling. For each measured put we publish `PutLatency` (ms) to CloudWatch in namespace `aws-sdk-js-v3` with dimensions `ClientType=StackBench`, `Stack`, `Size`, `OperationName=PutItem`, `Platform=lambda`.
 
-**Representative result (eu-west-1, Size=Small, Platform=lambda):** raw ≈ 4.8 ms. ElectroDB ≈ 4.9 ms (~+2% vs raw). DynamoDB Toolbox ≈ 5.2 ms (~+8% vs raw). Dynamoose ≈ 6.3 ms (~+31% vs raw). Service-side time is effectively constant across stacks (except Dynamoose’s bridge path). Ordering reflects client-side mapping cost. Full methodology in the [PoC micro-benchmark](#appendix-poc) appendix source.
+**Representative result (eu-west-1, Size=Small, Platform=lambda):** raw ≈ 4.8 ms. ElectroDB ≈ 4.9 ms (~~+2% vs raw). DynamoDB Toolbox ≈ 5.2 ms (~~+8% vs raw). Dynamoose ≈ 6.3 ms (~+31% vs raw). Service-side time is effectively constant across stacks (except Dynamoose’s bridge path). Ordering reflects client-side mapping cost. Full methodology in the [PoC micro-benchmark](#appendix-poc) appendix source.
 
 
-
-<a id="appendix-program-plan"></a>
 
 ### Program plan (product engineering)
 
@@ -665,11 +656,9 @@ For AWS program leadership (quarterly planning, resourcing, go/no-go gates). Sco
 
 
 
-<a id="appendix-j"></a>
-
 ### J. Estimation and priority labels
 
-Definitions: **M** = medium (governance / ~2 weeks). **L** = large (~3 weeks). **XL** = extra-large (multi-week engineering track). Effort words in [Appendix K](#appendix-k) (small / medium / large / extra-large) use the same scale for relative sizing only, not person-months.
+Definitions: **M** = medium (governance / ~~2 weeks). **L** = large (~~3 weeks). **XL** = extra-large (multi-week engineering track). Effort words in [Appendix K](#appendix-k) (small / medium / large / extra-large) use the same scale for relative sizing only, not person-months.
 
 ---
 
