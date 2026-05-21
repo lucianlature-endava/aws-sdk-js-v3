@@ -1,6 +1,5 @@
 # Feature & operation matrix: JS Labs v2, Java Enhanced, Proposed v3 DataMapper
 
-**Sources:** `[aws-sdk-js-v2-reference.md](./aws-sdk-js-v2-reference.md)`, `[aws-sdk-java-v2-reference.md](./aws-sdk-java-v2-reference.md)`
 
 **Columns**
 
@@ -16,6 +15,17 @@
 
 **Proposal v3 column:** Use **📋** for every in-scope mapper feature (planned for preview/GA, nothing shipped yet). **✅** in this matrix applies to **JS v2** and **Java Enhanced** only. Use **❌** / **🔶** / **🚫** / **⭕** as in [§11](#11-not-on-mapper-surface-any-column) and [§12](#12-optional-layers-proposal-v3-only).
 
+
+### What to use in reviews (do not infer from the repo spike)
+
+| Document                                          | Use for                                                                                                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **This matrix (`Proposal_v4.md`)**                | Product scope: what Proposal v3 commits to ship (📋 = planned, not done).                                                                                                 |
+| **`Proposal_v4_roadmap.md`**                      | When it ships (previews, GA).                                                                                                                                            |
+| **`Proposal_v3.md`**                              | HLD rationale and governance narrative.                                                                                                                                  |
+| **Code under `lib/lib-dynamodb-data-mapper/src`** | **Not authoritative for scope or schedule.** Early spike only. Type definitions for batch/transact/GSI/scan are design sketches and must not be read as “already built.” |
+
+For repo vs commitment gap, see [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
 
 ---
 
@@ -59,6 +69,22 @@
 | Custom type converters            | ✅ `Custom` + marshaller options           | ✅ `AttributeConverter` / `@DynamoDbConvertedBy`     | 📋 per-attribute converters (Java parity)                            |
 | Multi-table on one mapper client  | ✅                                         | ✅ one enhanced client, many `table()`               | 📋 one `DataMapper` factory, many `forTable` handles                 |
 
+
+### Nested and document types (detail for §2 rows)
+
+DynamoDB items are attribute maps. **Nested data** is stored as **`M` (map)** and **`L` (list)** (and typed sets). The three columns differ in **how the mapper describes and marshals** that shape, not in whether DynamoDB supports JSON-like blobs.
+
+| Pattern                            | Meaning                                                                  | JS v2 Labs                                                                                                                                                                                                   | Java Enhanced                                                                                                                                                                                             | Proposal v3 (planned)                                                                                                                                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Typed nested object on a row**   | A property is a structured sub-object still on **one item** (one PK/SK). | **`Document`** schema tag + **`embed(OtherClass)`** reuses another class’s schema. **`Map` / `Tuple`** tags for map/list/tuple shapes with schema children. Marshaller walks the tree into `AttributeValue`. | **`@DynamoDbFlatten`**: nested bean’s attributes are stored as **top-level** DynamoDB attributes on the same item (not a nested `M` wrapper). Inheritance + static `extend()` also flatten parent fields. | **`attributes` with nested schema** (object-typed fields) on `defineSchema`, marshalled through the document client. Keys/indexes stay explicit on the row schema. **Preview 5** (roadmap 5.2). |
+| **Collections on a row**           | Sets, maps, lists of scalars or documents.                               | **`List`**, **`Set`**, **`Map`**, **`Collection`** `SchemaType` tags.                                                                                                                                        | Default converters + optional **`AttributeConverter`**.                                                                                                                                                   | Same row as matrix: **Preview 5** (roadmap 5.3), via schema metadata + converters (5.1).                                                                                                        |
+| **Semi-structured / dynamic item** | Item shape varies or is not a fixed TS interface.                        | **`Any`**, loose **`Collection`** (partial).                                                                                                                                                                 | **`DocumentTableSchema`** + **`EnhancedDocument`**: schema built from items, read/write without a fixed bean.                                                                                             | Separate matrix row: **document schema path** (Java parity), also **Preview 5**. Not the default `forTable` product.                                                                            |
+
+**Labs v2 schema tags vs Proposal v3 (commitment, not repo state):** Labs shipped a full marshaller tag set (`String`, `Number`, `Boolean`, `Binary`, `Date`, `Document`, `Map`, `List`, `Set`, `Tuple`, `Null`, `Any`, `Custom`, `Collection`, …). Proposal v3 does **not** drop those capabilities from the product plan: scalars and primary CRUD/query land in **Preview 1–2**, **binary + converters + nested/collection schema** in **Preview 5** (§2 matrix rows). The gap vs Labs is **schedule and packaging** (`defineSchema` + document client), not a permanent removal of DynamoDB types.
+
+**Not document-ODM:** Nested attributes mean “this field is a map/list on **one DynamoDB item** with explicit PK/SK,” not “one nested JSON document replaces table design.” Multi-item aggregates (META + ITEM#n) remain explicit row types in schema, as in the HLD order example.
+
+**References:** Labs types in [`aws-sdk-js-v2-reference.md`](./aws-sdk-js-v2-reference.md) §7.7. Java flatten and document schema in [`aws-sdk-java-v2-reference.md`](./aws-sdk-java-v2-reference.md) §7.6 and [Flatten attributes](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/ddb-en-client-adv-features-flatmap.html), [`DocumentTableSchema`](https://docs.aws.amazon.com/java/api/latest/software/amazon/awssdk/enhanced/dynamodb/document/DocumentTableSchema.html).
 
 ---
 
@@ -120,11 +146,11 @@
 ## 6. Transactions
 
 
-| Operation                     | JS v2 | Java Enhanced          | Proposal v3                                                                  |
-| ----------------------------- | ----- | ---------------------- | ---------------------------------------------------------------------------- |
-| **TransactGetItems**          | ❌     | ✅ `transactGetItems`   | 📋 table handle + multi-table helper (Java parity)                            |
-| **TransactWriteItems**        | ❌     | ✅ `transactWriteItems` | 📋 `transactWrite` on handle + helper (Java parity)                           |
-| ConditionCheck in transaction | ❌     | ✅                      | 📋 `ConditionCheck` in typed `transactWrite` (Preview 3, not implemented yet) |
+| Operation                     | JS v2 | Java Enhanced          | Proposal v3                                             |
+| ----------------------------- | ----- | ---------------------- | ------------------------------------------------------- |
+| **TransactGetItems**          | ❌     | ✅ `transactGetItems`   | 📋 table handle + multi-table helper (Java parity)       |
+| **TransactWriteItems**        | ❌     | ✅ `transactWriteItems` | 📋 `transactWrite` on handle + helper (Java parity)      |
+| ConditionCheck in transaction | ❌     | ✅                      | 📋 `ConditionCheck` in typed `transactWrite` (Preview 3) |
 
 
 ---
