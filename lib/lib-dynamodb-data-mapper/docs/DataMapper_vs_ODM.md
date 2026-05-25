@@ -1,7 +1,7 @@
 # DataMapper vs ODM: same deliverables, different API shape
 
 > **Hypothetical comparison for review.**
-> **DataMapper column** = the proposed `@aws-sdk/lib-dynamodb-data-mapper` product. Phase mapping and ETAs in [`Proposal_v4_roadmap.md`](./Proposal_v4_roadmap.md).
+> **DataMapper column** = the proposed `@aws-sdk/lib-dynamodb-data-mapper` product. Phase mapping and ETAs in `[Proposal_v4_roadmap.md](./Proposal_v4_roadmap.md)`.
 > **ODM column** = hypothetical `@aws-sdk/lib-dynamodb-odm`, modeled on **Dynamoose** patterns. Not a committed product. Explicitly out of scope of the roadmap. No implementation in this repo.
 >
 > Goal: show that the **same committed deliverable** can take two very different API shapes. Same DynamoDB calls on the wire, different caller code, different ownership of keys and item layout, different refactoring cost when access patterns evolve.
@@ -11,24 +11,25 @@
 ## How to read
 
 - One row per committed deliverable on the DataMapper schedule. Section order (§1-§10) groups by capability.
-- **Phase column** = preview phase from [`Proposal_v4_roadmap.md`](./Proposal_v4_roadmap.md):
-  - `P1` = Preview 1, core CRUD + primary query (T0+8 wk).
-  - `P2` = Preview 2, indexes, expressions, pagination, optimistic locking (T0+16 wk).
-  - `P3` = Preview 3, scan, batch, transact, async iteration (T0+23 wk).
-  - `P4` = Preview 4, control plane and extensions (T0+29 wk).
-  - `P5` = Preview 5, schema depth, packaging, async pages (T0+35 wk).
+- **Phase column** = preview phase from `[Proposal_v4_roadmap.md](./Proposal_v4_roadmap.md)`:
+  - `P1` = Preview 1, core CRUD + primary query (T0+20 wd).
+  - `P2` = Preview 2, indexes, expressions, pagination, optimistic locking (T0+42 wd).
+  - `P3` = Preview 3, scan, batch, transact, async iteration (T0+62 wd).
+  - `P4` = Preview 4, control plane and extensions (T0+78 wd).
+  - `P5` = Preview 5, schema depth, packaging, async pages (T0+94 wd).
   - `Px/Py` = split between two phases (initial capability in `Px`, completion in `Py`).
   - `—` = no commitment on the DataMapper schedule (opt-in extension, or off-roadmap).
 - Out-of-scope items (PartiQL, DAX, attribute-level encryption, decorators-only schemas) are omitted from both columns.
 - Snippets are **illustrative API shape**, not full programs. Imports omitted.
 - Snippets in table cells are inline code (no syntax highlight on purpose, so they render correctly in every markdown viewer). Multi-line code lives in fenced TS blocks under each table.
-- For DataMapper, **`db`** = a `DynamoDBDocumentClient`. For ODM, **`odm`** = a configured `Odm` instance bound to that same document client.
+- For DataMapper, `**db`** = a `DynamoDBDocumentClient`. For ODM, `**odm`** = a configured `Odm` instance bound to that same document client.
 
 ---
 
 ## Concrete differences (what the caller writes, what the library hides)
 
 Both columns produce the same DynamoDB calls on the wire. They differ in **what the caller writes**, **what the library composes**, and **how code changes when access patterns evolve**. Every row below is observable in code, not a philosophical claim.
+
 
 | Question                                               | DataMapper                                                      | ODM                                                                                  |
 | ------------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -46,9 +47,11 @@ Both columns produce the same DynamoDB calls on the wire. They differ in **what 
 | What changes when one item splits into many rows?      | New row schema + new `forTable` + caller rewrites the query     | Schema change can stay opaque, app code may compile unchanged but wire shape changes |
 | Closest equivalent in JS ecosystem                     | Repository / DAO pattern, JDBC-shaped                           | Mongoose, Active Record                                                              |
 
+
 ---
 
 ## 1. Platform and packaging
+
 
 | Deliverable                      | Phase | DataMapper                                                                   | ODM                                                                                  |
 | -------------------------------- | ----- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -60,6 +63,7 @@ Both columns produce the same DynamoDB calls on the wire. They differ in **what 
 | Table name prefix                | P5    | `DataMapper.create({ client: db, tableNamePrefix: "prod_" })`                | `new Odm({ client: db, prefix: "prod_" })`                                           |
 | Custom user-agent                | P1    | Inherits `db` (per-client option on `DynamoDBDocumentClient`)                | Same: inherits `db`. ODM may also inject `lib-dynamodb-odm/<version>` via middleware |
 | Escape hatch to low-level client | P1    | `await db.send(new ScanCommand({ TableName: "T" }))`                         | `await User.rawClient().send(new ScanCommand({ TableName: "T" }))`                   |
+
 
 ---
 
@@ -108,6 +112,7 @@ const User = odm.model("User", userSchema, { tableName: "UserTable" });
 
 ### §2 row-by-row
 
+
 | Deliverable                       | Phase | DataMapper                                                                                       | ODM                                                                                             |
 | --------------------------------- | ----- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | Schema definition style           | P1    | `defineSchema({ attributes, indexes })` plain function, no decorators                            | `new Schema({...})` + `odm.model(...)`, decorators optional                                     |
@@ -128,9 +133,11 @@ const User = odm.model("User", userSchema, { tableName: "UserTable" });
 | Custom type converters            | P5    | `{ type: "string", converter: dateConverter }`                                                   | `{ type: Date, get: fn, set: fn }`                                                              |
 | Multi-table on one mapper client  | P1    | Many `forTable` handles on one `DataMapper` factory                                              | Many `odm.model(...)` calls on one `Odm` instance                                               |
 
+
 ---
 
 ## 3. Single-item operations
+
 
 | Deliverable                          | Phase | DataMapper                                                                         | ODM                                                                               |
 | ------------------------------------ | ----- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -147,9 +154,11 @@ const User = odm.model("User", userSchema, { tableName: "UserTable" });
 | Return values on delete              | P4    | `const { old } = await Users.delete(key).returnValues("ALL_OLD").execute()`        | `await User.delete(key, { return: "item" })`                                      |
 | `onMissing` for update               | P4    | `.update(key).set(patch).onMissing("REMOVE").execute()`                            | `User.update(key, patch, { settings: { ifMissingRemove: true } })`                |
 
+
 ---
 
 ## 4. Read operations (query, scan, pagination)
+
 
 | Deliverable                     | Phase | DataMapper                                                                 | ODM                                                                           |
 | ------------------------------- | ----- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -165,9 +174,11 @@ const User = odm.model("User", userSchema, { tableName: "UserTable" });
 | `filter` expression             | P2    | `.query(...).filter(c => c.attr("active").eq(true)).execute()`             | `User.query(...).filter("active").eq(true).exec()`                            |
 | `scanIndexForward`              | P2    | `.query(...).descending().execute()`                                       | `User.query(...).sort("descending").exec()`                                   |
 
+
 ---
 
 ## 5. Batch operations
+
 
 | Deliverable                        | Phase | DataMapper                                                                    | ODM                                                                     |
 | ---------------------------------- | ----- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -179,17 +190,20 @@ const User = odm.model("User", userSchema, { tableName: "UserTable" });
 | Multi-table batch (one call)       | P3    | `DataMapper.batchWrite([Users.puts([...]), Orders.deletes([...])]).execute()` | `odm.batchWrite([...mixed])`                                            |
 | Per-table batch options            | P3    | `Users.batchGet([k]).project(["name"]).consistent()`                          | `User.batchGet([k], { attributes: ["name"], consistent: true })`        |
 
+
 ---
 
 ## 6. Transactions
 
 The cells link to fenced examples below the table for the multi-statement ones.
 
+
 | Deliverable                  | Phase | DataMapper                                                                      | ODM                                                                                             |
 | ---------------------------- | ----- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **TransactGetItems**         | P3    | `await DataMapper.transactGet([Users.keys([k1]), Orders.keys([k2])]).execute()` | `await odm.transaction([User.transaction.get(k1), Order.transaction.get(k2)], { type: "get" })` |
 | **TransactWriteItems**       | P3    | see `transactWrite (DataMapper)` below                                          | see `transactWrite (ODM)` below                                                                 |
 | `ConditionCheck` in transact | P3    | see `conditionCheck (DataMapper)` below                                         | see `conditionCheck (ODM)` below                                                                |
+
 
 **transactWrite (DataMapper)**
 
@@ -231,18 +245,21 @@ odm.transaction([
 
 ## 7. Table and index lifecycle (control plane)
 
+
 | Deliverable                          | Phase | DataMapper                                                                           | ODM                                                                                        |
 | ------------------------------------ | ----- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | **CreateTable** (+ wait active)      | P4    | `await Users.createTable({ waitActive: true, billing: "PAY_PER_REQUEST" })`          | `await User.createTable({ waitForActive: true })` (auto-create on first op also supported) |
 | **EnsureTableExists**                | P4    | `await Users.ensureTableExists()`                                                    | `odm.model(..., { create: true, waitForActive: true })` (init-time)                        |
 | **DeleteTable** (+ wait)             | P4    | `await Users.deleteTable({ wait: true })`                                            | `await User.deleteTable({ wait: true })`                                                   |
 | **EnsureTableNotExists**             | P4    | `await Users.ensureTableNotExists()`                                                 | `await odm.dropIfExists("UserTable")`                                                      |
-| **CreateGSI / ensure GSI**           | P4    | Derived from `indexes.gsi.*` on `createTable` / `updateTable`                        | Derived from per-attribute `index: { name, type: "global" }` declarations                  |
+| **CreateGSI / ensure GSI**           | P4    | Derived from `indexes.gsi.`* on `createTable` / `updateTable`                        | Derived from per-attribute `index: { name, type: "global" }` declarations                  |
 | Billing mode, SSE, streams in create | P4    | `Users.createTable({ billing: "PAY_PER_REQUEST", sse: true, streams: "NEW_IMAGE" })` | `User.createTable({ throughput: "ON_DEMAND", encryption: { type: "AWS_OWNED" } })`         |
+
 
 ---
 
 ## 8. Expressions and update DSL
+
 
 | Deliverable                   | Phase | DataMapper                                                                                           | ODM                                                                   |
 | ----------------------------- | ----- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -255,9 +272,11 @@ odm.transaction([
 | Schema-aware name mapping     | P2    | Builders read from schema. `attr("name")` becomes `#n0` and resolves the physical name automatically | Same idea, via schema metadata                                        |
 | Attribute path helper         | P2    | `attr("address.city")`                                                                               | `"address.city"` (string path)                                        |
 
+
 ---
 
 ## 9. Optimistic locking, hooks, extensions
+
 
 | Deliverable                            | Phase | DataMapper                                                                               | ODM                                                                                       |
 | -------------------------------------- | ----- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -270,9 +289,11 @@ odm.transaction([
 | Pluggable extension chain              | P4    | `DataMapper.create({ client: db, extensions: [versionExt(), uuidExt(), counterExt()] })` | `odm.use(versionPlugin); odm.use(timestampPlugin); odm.use(uuidPlugin)`                   |
 | Write-if-not-exists semantics          | P4    | `.put(row).condition(c => c.attr("pk").notExists()).execute()`                           | `await User.create(item, { overwrite: false })`                                           |
 
+
 ---
 
 ## 10. Errors and observability
+
 
 | Deliverable                       | Phase | DataMapper                                                            | ODM                                                                                 |
 | --------------------------------- | ----- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -280,6 +301,7 @@ odm.transaction([
 | Schema validation errors          | P1    | `MapperValidationError` distinct from `ServiceError`                  | `ValidationError`, `CastError`, distinct from `AWSError`                            |
 | Service errors passthrough        | P1    | Original SDK error reachable via `error.cause`                        | Wrapped: `error.original` keeps the SDK error                                       |
 | Dirty-field / change tracking     | —     | **Not default.** Optional `dirtyTracking` extension only              | **First-class.** `doc.isModified("name")`, `doc.save()` writes only modified fields |
+
 
 ---
 
@@ -300,6 +322,7 @@ Walk down the matrix and notice how many rows have **identical wire behavior** w
 
 ### Common foundation (engine, same in both)
 
+
 | Concern                               | Shared module                                           | Why it is the same                                                                    |
 | ------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | Schema metadata model                 | `SchemaMeta` (attributes, indexes, defaults)            | Both surfaces compile their DSL into the same internal description of a row           |
@@ -314,7 +337,9 @@ Walk down the matrix and notice how many rows have **identical wire behavior** w
 | Index resolution                      | `IndexRegistry`                                         | Logical-name to physical-name lookup, same for primary / GSI / LSI                    |
 | User-agent middleware                 | client option on `DynamoDBDocumentClient`               | Same middleware stack, same `customUserAgent` slot                                    |
 
+
 ### Surface-specific code (the ~20% that diverges)
+
 
 | Concern                          | DataMapper                             | ODM                                               |
 | -------------------------------- | -------------------------------------- | ------------------------------------------------- |
@@ -326,6 +351,7 @@ Walk down the matrix and notice how many rows have **identical wire behavior** w
 | Index naming on query            | Caller passes `IndexName` to `query()` | Library infers `IndexName` from queried attribute |
 | Default error mode for missing   | Returns `undefined`                    | Returns `undefined`, `throwIfMissing` opt-in      |
 | Lifecycle hook ergonomics        | Options on `forTable(...)`             | `schema.pre("save", ...)`, plugin chain           |
+
 
 ### Layering
 
@@ -360,12 +386,14 @@ flowchart TD
   class DDB ddb
 ```
 
+
+
 ### Build recommendation
 
 - **Do not ship a separate `mapper-core` package at GA.** That would freeze an internal contract before either surface has hardened in customer use. Premature split.
 - **Build the engine as internal modules inside `@aws-sdk/lib-dynamodb-data-mapper`** under `src/core/*` (`expression/`, `pagination/`, `batch/`, `transact/`, `extension/`, `marshal/`, `errors/`, `schema-meta/`). Mark them `@internal` in JSDoc, exclude from `package.json#exports`, keep the public surface focused on the mapper.
 - **Design every core module behind a small interface** (`SchemaMeta`, `Marshaller<T>`, `ExpressionCompiler`, etc.) so the DataMapper surface depends on **the interface, not the implementation**. This is what makes a later extraction cheap.
-- **If ODM ever gets funded,** extract `src/core/*` into `@aws-sdk/lib-dynamodb-mapper-core` (or `@aws-sdk/lib-dynamodb-internal`), have both packages depend on it. The split becomes mechanical, no rewriting.
+- **If ODM ever gets funded,** extract `src/core/`* into `@aws-sdk/lib-dynamodb-mapper-core` (or `@aws-sdk/lib-dynamodb-internal`), have both packages depend on it. The split becomes mechanical, no rewriting.
 
 ### Precedent: AWS SDK for Java v2
 
@@ -476,7 +504,8 @@ The proposal recommends DataMapper as the **default** product for that reason. O
 
 ## Status
 
-- This document is **review material**, not a committed API. Final names, builder shapes, and ODM cells are illustrative. Names will harden at the Phase 6 (RC) API freeze, see [`Proposal_v4_roadmap.md`](./Proposal_v4_roadmap.md).
+- This document is **review material**, not a committed API. Final names, builder shapes, and ODM cells are illustrative. Names will harden at the Phase 6 (RC) API freeze, see `[Proposal_v4_roadmap.md](./Proposal_v4_roadmap.md)`.
 - The DataMapper column reflects the deliverables committed in `Proposal_v4_roadmap.md`. Anything here that contradicts the roadmap is a doc bug. Open an issue.
 - The ODM column has **no implementation** in this repo. It exists purely to evaluate API-shape alternatives before any second-surface decision.
 - Any code already in `lib/lib-dynamodb-data-mapper/src` is an **internal spike only**. Do not infer scope, schedule, or API stability from it. The authoritative sources for review are this document and the roadmap, nothing else.
+
