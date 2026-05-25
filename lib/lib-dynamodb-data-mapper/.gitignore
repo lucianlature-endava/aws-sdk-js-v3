@@ -8,6 +8,7 @@
 !/docs/
 !/docs/DataMapper_vs_ODM.md
 !/docs/Proposal_v4_roadmap.md
+!/docs/DESIGN.md
 /temp/
 *.tsbuildinfo
 *.tgz
