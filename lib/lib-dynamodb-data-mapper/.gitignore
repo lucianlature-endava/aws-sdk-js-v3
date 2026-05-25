@@ -6,7 +6,8 @@
 # Ignore generated docs; track the proposal explicitly (git cannot un-ignore a file inside an ignored directory without un-ignoring the path first).
 /docs/*
 !/docs/
-!/docs/Proposal_v3.md
+!/docs/DataMapper_vs_ODM.md
+!/docs/Proposal_v4_roadmap.md
 /temp/
 *.tsbuildinfo
 *.tgz
