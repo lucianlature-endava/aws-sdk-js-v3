@@ -100,9 +100,9 @@ Before GA, performance is measured against the document client in CI, preview ch
 
 ```mermaid
 flowchart TD
-  App["Application (TypeScript)"]
+  App["Application (JavaScript/TypeScript)"]
 
-  subgraph PKG["@aws-sdk/lib-dynamodb-data-mapper"]
+  subgraph PKG["@aws-sdk/lib-dynamodb-<mapper layer>"]
     direction TB
 
     subgraph Surf["Public surfaces"]
