@@ -20,11 +20,11 @@ JavaScript and TypeScript teams using DynamoDB have two AWS-supported options to
 
 ### The cost of the gap
 
-Until AWS ships a default mapping layer, customers fill the space with community libraries, internal helpers, or repeated document-client patterns in each service. Documentation, training, and safety all fragment as a result. npm trends still point the same way: the archived Labs DataMapper keeps a steady flow of monthly installs, and roughly one in four teams that use `lib-dynamodb` also pull in a higher-level DynamoDB abstraction that AWS does not own. [Appendix F](#f-npm-download-volume-and-community-wrapper-demand) holds the full download tables and the March 2026 wrapper breakdown. [Appendix D](#d-companion-sentiment-bundle) summarizes the qualitative friction behind those numbers.
+Until AWS ships a default mapping layer, customers fill the space with community libraries, internal helpers, or repeated document-client patterns in each service. Documentation, training, and safety all fragment as a result. Npm trends still point the same way: the archived Labs DataMapper keeps a steady flow of monthly installs, and roughly one in four teams that use `lib-dynamodb` also pull in a higher-level DynamoDB abstraction that AWS does not own. [Appendix F](#f-npm-download-volume-and-community-wrapper-demand) holds the full download tables and the March 2026 wrapper breakdown. [Appendix D](#d-companion-sentiment-bundle) summarizes the qualitative friction behind those numbers.
 
 ### The decision
 
-AWS should ship an official high level client as an **additive, opt-in** package on `DynamoDBDocumentClient`: typed create, read, update, delete, and query for the common case, with strong typing, repeatable behaviour, and the same escape hatch teams already use on the document client. That gives one coherent adoption story, safe operational defaults, and a place to evolve best practices without changing the DynamoDB service API.
+AWS should ship an official high level client as an **additive, opt-in** package on `DynamoDBDocumentClient`: typed create, read, update, delete, and query for the common case, with strong typing, repeatable behavior, and the same escape hatch teams already use on the document client. That gives one coherent adoption story, safe operational defaults, and a place to evolve best practices without changing the DynamoDB service API.
 
 ### Why now
 
@@ -32,17 +32,17 @@ Backend and serverless adoption in JavaScript/TypeScript is mature. Internal tea
 
 ### Has a similar problem existed or been solved before
 
-Java and .NET already ship first-party enhanced clients. Labs DataMapper proved the pattern on v2 before archival left a succession gap on v3. Community libraries (Toolbox, ElectroDB, Dynamoose) show demand, but they cannot replace an AWS-owned default on `@aws-sdk/*` with named ownership, support, and lifecycle aligned to other v3 libraries. This program targets GA as first-party software, not Labs-only delivery.
+Java and .NET already ship first-party enhanced clients. Labs DataMapper proved the pattern on v2 before archival left a gap after archival on v3. Community libraries (Toolbox, ElectroDB, Dynamoose) show demand, but they cannot replace an AWS-owned default on `@aws-sdk/*` with named ownership, support, and lifecycle aligned to other v3 libraries. This program targets GA as first-party software, not Labs-only delivery.
 
 ## Tenets
 
 Teams already trust the document client for credentials, IAM, and the path to DynamoDB. This program adds an optional layer on that same stack (`@aws-sdk/lib-dynamodb` → `DynamoDBDocumentClient` → generated client), so the foundation does not change when a service opts in. Adoption stays reversible: pin the package or stop importing it, and existing call sites keep working.
 
-[Appendix K](#k-program-plan-product-engineering) is the contract for what we build and when. One scope, eight engineering phases (0–7) plus a program buffer, one supported delivery at GA. The list fixes capabilities, not a single caller-facing style (schema-first and document-oriented shapes can deliver the same work), and it deliberately excludes automatic GSI routing, DAX bundled inside the high level client package, and production table provisioning as the default operations story.
+[Appendix K](#k-program-plan-product-engineering) is the contract for what we build and when. One scope, eight engineering phases (0–7) plus a program buffer, one supported delivery at GA. The list fixes capabilities, not a single caller-facing style (schema-first and document-oriented shapes can deliver the same work, with methodology and conclusions in [Appendix N](#n-caller-facing-api-shapes-methodology-and-conclusions)), and it deliberately excludes automatic GSI routing, DAX bundled inside the high level client package, and production table provisioning as the default operations story.
 
-Modelling stays in plain TypeScript: `defineSchema({ attributes, indexes })` with inference, without decorator requirements, so serverless bundles and mixed JS/TS repos can adopt without extra compiler ceremony. [Appendix E](#e-schema-functions-over-decorators-and-java-comparator) explains the Java comparator and why that choice fits this ecosystem.
+Modeling stays in plain TypeScript: `defineSchema({ attributes, indexes })` with inference, without decorator requirements, so serverless bundles and mixed JS/TS repos can adopt without extra compiler ceremony. [Appendix E](#e-schema-functions-over-decorators-and-java-comparator) explains the Java comparator and why that choice fits this ecosystem.
 
-Security and operations inherit from the document client, that means the same credentials, IAM, TLS, and logging defaults, while the high level client adds typed validation context and keeps item payloads and secrets out of default logs. At GA the program delivers document mapping and everyday DynamoDB work: typed access, expression helpers, pagination, batch and transact chunking, optimistic locking when declared, hooks where appropriate, and explicit index names on every query. [Committed Scope](#committed-scope) below and [Appendix C](#c-api-surface-illustrative) sketch illustrative API shape only.
+Security and operations inherit from the document client, that means the same credentials, IAM, TLS, and logging defaults, while the high level client adds typed validation context and keeps item payloads and secrets out of default logs. At GA the program delivers document mapping and everyday DynamoDB work: typed access, expression helpers, pagination, batch and transact chunking, optimistic locking when declared, hooks where appropriate, and explicit index names on every query. [What we are launching](#what-we-are-launching) and [Appendix C](#c-api-surface-illustrative) sketch illustrative API shape only.
 
 ## Intended Customer Experience
 
@@ -56,17 +56,25 @@ Delivery is **one program, eight engineering phases plus buffer, one GA outcome.
 
 **Phase 3** (19 wd) broadens reads and writes with scan, parallel scan, batch and transact helpers, multi-table utilities, and async iteration. **Phase 4** (16 wd) adds table lifecycle helpers, extensions and hooks, return values, and update modes. **Phase 5** (16 wd) completes schema depth (converters, nested and document paths, async pages) and locks the subpath packaging decision.
 
-**Phase 6** (10 wd) is the release candidate: API freeze, migration guide, parity documentation, and perf gates on every PR. **Phase 7** (6 wd) is general availability with a named AWS owner and a supported release on the normal `@aws-sdk/*` cadence. A **program buffer** of 10 wd covers review and release-train slip.
+**Phase 6** (10 wd) is the release candidate: API freeze, migration guide, parity documentation, and performance gates on every PR. **Phase 7** (6 wd) is general availability with a named AWS owner and a supported release on the normal `@aws-sdk/*` cadence. A **program buffer** of 10 wd covers review and release-train slip.
 
 Customers see incremental preview-channel releases through Phases 1 to 5. **GA** after Phases 0–7 and the program buffer is the only supported product delivery (~**120 wd** estimated engineering plus buffer, detail in [Appendix K](#k-program-plan-product-engineering)).
 
+Every high level client request uses the application’s configured `DynamoDBDocumentClient`, with the same `send`, retries, middleware, credentials, and region behavior, with no second pipeline.
+
+Committed at GA (via phased delivery in [Appendix K](#k-program-plan-product-engineering)): `defineSchema` and `forTable`, typed get, put, update, delete, and query on the primary key (and sort key where present), named GSI/LSI query with explicit index and key condition, expression and condition and update builders, pagination, batch and transact chunking, optimistic locking via a declared version attribute, lifecycle hooks, distinct high level client vs service errors, scan and parallel scan, table lifecycle helpers for dev and test, nested and document schema depth, converters, and packaging choices frozen at RC.
+
+TTL writes, advanced conditionals, transactions, and any operation the high level client does not wrap remain reachable on the same document client. Omission from the public API is not a prohibition on the underlying client.
+
+Automatic GSI routing, a mandated full ORM, a DAX-specific module bundled in the program package, decorator-only schemas, streams mapping as a first-class program feature, and production table creation as the default way teams manage infrastructure are not on the committed deliverable list. Phase 4 table helpers target dev, test, and samples, with IaC as the production default.
+
 ### Key benefits
 
-Teams gain an AWS-backed elevated path alongside the JavaScript v3 packages they already ship, in the same spirit as enhanced clients on Java and .NET. A squad can start with one service, prove value there, and expand when the library earns trust, or walk away without rewriting the rest of the estate. When a call does not belong in the high level client, the same document client they use today is still one step away.
+Teams gain an AWS-backed high-level path alongside the JavaScript v3 packages they already ship, in the same spirit as enhanced clients on Java and .NET. A squad can start with one service, prove value there, and expand when the library earns trust, or walk away without rewriting the rest of the estate. When a call does not belong in the high level client, the same document client they use today is still one step away.
 
 ### Why use the high level client
 
-Most teams already repeat the same work on every feature: shaping keys, stitching expressions, and hoping conditions still match the table. A first-party high level client turns that into shared rules so new services inherit the same behaviour instead of copying snippets from an older repo. That lowers the chance of quiet mistakes on indexes and conditions, gives AWS a single place to document the common path, and still leaves room for community libraries where teams have already standardised on them.
+Most teams already repeat the same work on every feature: shaping keys, stitching expressions, and hoping conditions still match the table. A first-party high level client turns that into shared rules so new services inherit the same behavior instead of copying snippets from an older repo. That lowers the chance of quiet mistakes on indexes and conditions, gives AWS a single place to document the common path, and still leaves room for community libraries where teams have already standardized on them.
 
 ### How to use it
 
@@ -76,29 +84,17 @@ For scan filters, cross-table orchestration, or TTL admin, call `db.send(...)` o
 
 ### How this relates to other AWS services
 
-This program lives entirely on the customer side of the DynamoDB data plane. It does not ask the service team to change APIs or table behaviour. `@aws-sdk/client-dynamodb` and `@aws-sdk/lib-dynamodb` remain the foundation, with the same IAM model teams already operate under. DAX stays a customer choice: point the document client at a cluster endpoint when acceleration helps, without pulling DAX into the high level client package. Traces and metrics continue through the middleware customers already attach. Teams that standardized on a community library can keep it alongside this one where that still makes sense.
+This program lives entirely on the customer side of the DynamoDB data plane. It does not ask the service team to change APIs or table behavior. `@aws-sdk/client-dynamodb` and `@aws-sdk/lib-dynamodb` remain the foundation, with the same IAM model teams already operate under. DAX stays a customer choice: point the document client at a cluster endpoint when acceleration helps, without pulling DAX into the high level client package. Traces and metrics continue through the middleware customers already attach. Teams that standardized on a community library can keep it alongside this one where that still makes sense.
 
 ## Important Design Decisions and Tradeoffs
 
 The program ships as its own package beside `@aws-sdk/lib-dynamodb`, not folded into it. That trades an extra package to own and document for room to iterate in preview phases and for teams to adopt or roll back without touching every document-client consumer. We considered folding mapping into `lib-dynamodb`, pushing it into generated clients, or reviving Labs code unchanged. A sibling package keeps the boundary clear.
 
-Modelling starts with an explicit schema: a small upfront definition buys consistent types and safer upgrades, while teams that want full control can still call the document client directly. The exact caller-facing shape stays open until RC. Delivery is a core high level client plus helpers that teams can take in steps—expression, pagination, batch, and locking utilities first where that is enough, the full client when it has proved its value. Preview feedback points toward neutral modelling with AWS-owned helpers rather than a mandated style.
+Modeling starts with an explicit schema: a small upfront definition buys consistent types and safer upgrades, while teams that want full control can still call the document client directly. The exact caller-facing shape stays open until RC. Delivery is a core high level client plus helpers that teams can take in steps (expression, pagination, batch, and locking utilities first where that is enough), then the full client when it has proved its value. Preview feedback points toward neutral modeling with AWS-owned helpers rather than a mandated style.
 
-Scope stays deliberately narrow: document mapping and everyday DynamoDB operations at GA, not a full database framework. Packaging may split core and helpers across subpaths or separate npm artifacts (decided in Phase 5). Expression builders ship as part of the program so teams are not left hand-rolling strings, and every query names its index and supplies key conditions, so there is no automatic GSI routing. Schema evolution rules must be spelled out as the API matures: forward-compatible reads by default, stricter modes for greenfield work, and no silent data loss when attributes appear, disappear, or rename.
+Scope stays deliberately narrow: document mapping and everyday DynamoDB operations at GA, not a full database framework. Packaging may split core and helpers across subpaths or separate npm artifacts (decided in Phase 5). Expression builders ship as part of the program so teams are not left hand-rolling strings, and every query names its index and supplies key conditions, so there is no automatic GSI routing. Schema evolution rules must be spelled out as the API matures: forward-compatible reads by default, stricter modes for new projects, and no silent data loss when attributes appear, disappear, or rename.
 
-Before GA, performance is measured against the document client in CI, preview channels follow semver discipline, and the public API freezes only after that evidence. [Appendix J](#j-poc-micro-benchmark) summarises benchmark work. [Appendix G](#g-community-libraries-vs-proposed-first-party-high-level-client-illustrative-comparison), [Appendix I](#i-acquisition-alternatives-adaptation-to-document-client-and-aws-sdk), and [Appendix F](#f-npm-download-volume-and-community-wrapper-demand) cover community comparison and adopt-versus-greenfield analysis.
-
-## Committed Scope
-
-**GA is the single product delivery**, reached through **Phases 0–7 and a program buffer** (eight engineering phases plus buffer, **~120 wd** estimated total effort). [Appendix K](#k-program-plan-product-engineering) is the authoritative list of what ships in each phase and with what effort. The summary below groups that list for readers of this design document.
-
-Every high level client request uses the application’s configured `DynamoDBDocumentClient`—same `send`, retries, middleware, credentials, and region behaviour, with no second pipeline.
-
-**Committed at GA (via phased delivery in [Appendix K](#k-program-plan-product-engineering)):** `defineSchema` and `forTable`, typed get, put, update, delete, and query on the primary key (and sort key where present), named GSI/LSI query with explicit index and key condition, expression and condition and update builders, pagination, batch and transact chunking, optimistic locking via a declared version attribute, lifecycle hooks, distinct high level client vs service errors, scan and parallel scan, table lifecycle helpers for dev and test, nested and document schema depth, converters, and packaging choices frozen at RC.
-
-**Always reachable on the same document client:** TTL writes, advanced conditionals, transactions, and any operation the high level client does not wrap. Omission from the public API is not a prohibition on the underlying client.
-
-**Not on the committed deliverable list:** automatic GSI routing, a mandated full ORM, a DAX-specific module bundled in the program package, decorator-only schemas, streams mapping as a first-class program feature, or production table creation as the default way teams manage infrastructure (Phase 4 table helpers target dev, test, and samples, with IaC as the production default).
+Before GA, performance is measured against the document client in CI, preview channels follow semantic versioning discipline, and the public API freezes only after that evidence. [Appendix J](#j-exploratory-micro-benchmark) summarizes benchmark work. [Appendix G](#g-community-libraries-vs-proposed-first-party-high-level-client-illustrative-comparison), [Appendix I](#i-acquisition-alternatives-adaptation-to-document-client-and-aws-sdk), and [Appendix F](#f-npm-download-volume-and-community-wrapper-demand) cover community comparison and adoption versus new build analysis.
 
 ## High Level Design
 
@@ -162,23 +158,23 @@ flowchart TD
   Doc -.-> EM
 ```
 
-Public surfaces call into one shared engine before every `send(Command)`. The engine modules in the diagram are internal at GA (`src/core/*`, not exported). A second caller-facing shape later would reuse the same engine without duplicating wire logic.
+Public surfaces call into one shared engine before every `send(Command)`. The engine modules in the diagram are internal at GA (`src/core/*`, not exported). A second caller-facing shape later would reuse the same engine without duplicating DynamoDB request path.
 
-A typical read or write follows the same story. The library checks the row against the table definition, runs any hooks the team registered, builds keys and expressions, converts the row to DynamoDB’s wire shape, and hands the command to the same document client the application already uses. Paged queries, batch calls, and transactions reuse that path through the shared paging and chunking helpers. When something fails, the library classifies whether the problem came from validation or from the service, and keeps the original service error available for existing handlers. Module layout, a per-step flow diagram, and illustrative interfaces are in [Appendix A](#a-architecture-illustrative).
+A typical read or write follows the same story. The library checks the row against the table definition, runs any hooks the team registered, builds keys and expressions, converts the row to DynamoDB’s item shape, and hands the command to the same document client the application already uses. Paged queries, batch calls, and transactions reuse that path through the shared paging and chunking helpers. When something fails, the library classifies whether the problem came from validation or from the service, and keeps the original service error available for existing handlers. Module layout, a per-step flow diagram, and illustrative interfaces are in [Appendix A](#a-architecture-illustrative).
 
 Teams keep their own observability stack. The program does not require a specific vendor or agent. Hooks around operations could exist so teams can inject tracing or metrics where they already do today. When a use case falls outside the library, the application can still call the low-level or document client directly on the same configured client. Illustrative types are in [Appendix B](#b-typings-illustrative). An end-to-end API walkthrough is in [Appendix C](#c-api-surface-illustrative).
 
 ### Design limitations
 
-The committed list targets production-shaped document mapping, not every enterprise pattern. Items outside [Appendix K](#k-program-plan-product-engineering) stay off this program unless leadership explicitly widens the charter. Bundle size and import cost are first-class and measured in CI. PoC code under `lib/lib-dynamodb-data-mapper/src` is an internal spike only and does not define scope or schedule.
+The committed list targets production-shaped document mapping, not every enterprise pattern. Items outside [Appendix K](#k-program-plan-product-engineering) stay off this program unless leadership explicitly widens program scope. Bundle size and import cost are first-class and measured in CI. Code under `lib/lib-dynamodb-data-mapper/src` is internal exploratory code only and does not define scope or schedule.
 
 ### Dependencies taken
 
-Inherits retries and throttling from the configured client. DynamoDB Local in CI for integration tests. Publish on the npm preview channel until RC, then normal `@aws-sdk/`* cadence. SDK + DynamoDB review bandwidth and change board after Phase 2 exit; 10 wd program buffer for release-train slip. DynamoDB **service** API unchanged—client-side only.
+Inherits retries and throttling from the configured client. DynamoDB Local in CI for integration tests. Publish on the npm preview channel until RC, then normal `@aws-sdk/`* cadence. SDK + DynamoDB review bandwidth and change board after Phase 2 exit. A 10 wd program buffer covers release-train slip. DynamoDB **service** API unchanged (client-side only).
 
 ## Rollout and Rollback Strategy
 
-Each phase ships incremental capability on npm preview tags (semver-minor until RC). RC freezes API and publishes migration guide (Labs v2, document client, coexistence with community libs). GA on `^1.x` with named AWS owner.
+Each phase ships incremental capability on npm preview tags (semantic versioning-minor until RC). RC freezes API and publishes migration guide (Labs v2, document client, coexistence with community libs). GA on `^1.x` with named AWS owner.
 
 **Rollback:** remove the high level client import, keep document client, finally pin a prior preview-channel release if needed. No data migration is needed. Breaking changes after GA: major bump per SDK policy.
 
@@ -190,7 +186,7 @@ The library runs in the application process like any other npm dependency. Teams
 
 We will prove the library in CI with unit and integration tests against DynamoDB Local, checks at each phase exit, and performance comparisons to the document client from Phase 2 onward. Before we publish overhead or bundle-size targets, those numbers need to pass agreed gates in CI. Golden migration tests land with the release candidate.
 
-Nothing changes on the DynamoDB service API. Existing tables, indexes, transactions, TTL, streams, encryption, and DAX usage behave the same on the wire. DAX remains a customer configuration on the document client endpoint, not a dependency bundled into this package. A second caller-facing API, codegen from shared schema metadata, or ecosystem adapters would be follow-on work only if there is clear demand and funding after GA.
+Nothing changes on the DynamoDB service API. Existing tables, indexes, transactions, TTL, streams, encryption, and DAX usage behave the same in DynamoDB requests. DAX remains a customer configuration on the document client endpoint, not a dependency bundled into this package. A second caller-facing API, codegen from shared schema metadata, or ecosystem adapters would be follow-on work only if there is clear demand and funding after GA.
 
 
 ## Key Feedback
@@ -202,20 +198,21 @@ No blocking feedback recorded yet. When feedback arrives, record provider(s), st
 
 ### Guide
 
-**Contents:** [A](#a-architecture-illustrative) · [B](#b-typings-illustrative) · [C](#c-api-surface-illustrative) · [D](#d-companion-sentiment-bundle) · [E](#e-schema-functions-over-decorators-and-java-comparator) · [F](#f-npm-download-volume-and-community-wrapper-demand) · [G](#g-community-libraries-vs-proposed-first-party-high-level-client-illustrative-comparison) · [H](#h-estimation-and-priority-labels) · [I](#i-acquisition-alternatives-adaptation-to-document-client-and-aws-sdk) · [J](#j-poc-micro-benchmark) · [K](#k-program-plan-product-engineering) · [L](#l-template-sections-omitted-from-impact) · [M](#m-poc-code-in-repo)
+**Contents:** [A](#a-architecture-illustrative) · [B](#b-typings-illustrative) · [C](#c-api-surface-illustrative) · [D](#d-companion-sentiment-bundle) · [E](#e-schema-functions-over-decorators-and-java-comparator) · [F](#f-npm-download-volume-and-community-wrapper-demand) · [G](#g-community-libraries-vs-proposed-first-party-high-level-client-illustrative-comparison) · [H](#h-estimation-and-priority-labels) · [I](#i-acquisition-alternatives-adaptation-to-document-client-and-aws-sdk) · [J](#j-exploratory-micro-benchmark) · [K](#k-program-plan-product-engineering) · [L](#l-template-sections-omitted-from-impact) · [M](#m-exploratory-code-in-repo) · [N](#n-caller-facing-api-shapes-methodology-and-conclusions)
 
 - **Committed features, phasing, and effort:** [Appendix K](#k-program-plan-product-engineering).
+- **Caller-facing API shapes (methodology and conclusions):** [Appendix N](#n-caller-facing-api-shapes-methodology-and-conclusions).
 - **Demand signals (downloads, community totals):** [Appendix F](#f-npm-download-volume-and-community-wrapper-demand).
 - **Community libraries (capabilities):** [Appendix G](#g-community-libraries-vs-proposed-first-party-high-level-client-illustrative-comparison).
 - **Java Enhanced comparator (schema mapping):** [Appendix E](#e-schema-functions-over-decorators-and-java-comparator).
-- **Sentiment corpus:** [Appendix D](#d-companion-sentiment-bundle).
-- **Acquisition / greenfield:** [Appendix I](#i-acquisition-alternatives-adaptation-to-document-client-and-aws-sdk).
+- **Sentiment collection:** [Appendix D](#d-companion-sentiment-bundle).
+- **Acquisition / new build:** [Appendix I](#i-acquisition-alternatives-adaptation-to-document-client-and-aws-sdk).
 
 ---
 
 ### A. Architecture (Illustrative)
 
-The elevated client sits above the document client. Generated clients stay unchanged. The library wraps them in place and keeps a single source of generated code. The layer is modular: a core package plus expression builders, pagination helpers, and batch/transaction utilities (separate npm packages, stable subpath exports under one umbrella, or both—decided at Phase 5).
+The high level client sits above the document client. Generated clients stay unchanged. The library wraps them in place and keeps a single source of generated code. The layer is modular: a core package plus expression builders, pagination helpers, and batch/transaction utilities (separate npm packages, stable subpath exports under one umbrella, or both, decided at Phase 5).
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -256,7 +253,7 @@ The elevated client sits above the document client. Generated clients stay uncha
                        AWS DynamoDB
 ```
 
-The four boxes in the diagram are **public surfaces** (core handle, expression builders, pagination, batch/transact). Under them sits one **shared engine** that every surface reuses. Today’s PoC inlines key steps in `schema.ts` and `table.ts` (key composition, strip `pk`/`sk`, hand-built update expressions). GA moves that work behind small interfaces under `src/core/*` so a future second caller-facing shape could share the same engine without rewriting wire logic.
+The four boxes in the diagram are **public surfaces** (core handle, expression builders, pagination, batch/transact). Under them sits one **shared engine** that every surface reuses. Today’s exploratory code inlines key steps in `schema.ts` and `table.ts` (key composition, strip `pk`/`sk`, hand-built update expressions). GA moves that work behind small interfaces under `src/core/*` so a future second caller-facing shape could share the same engine without rewriting DynamoDB request path.
 
 #### Shared engine (illustrative)
 
@@ -279,13 +276,13 @@ flowchart LR
   U -.-> E
 ```
 
-**SchemaMeta** is the canonical description of a table: logical attributes, storage names, nested document paths, defaults, and version-attribute flags. Surfaces never pass raw schema objects to the wire layer; they compile into `SchemaMeta` once per `forTable` binding. Validation, projection lists, and “what belongs on this row” all read from here.
+**SchemaMeta** is the canonical description of a table: logical attributes, storage names, nested document paths, defaults, and version-attribute flags. Surfaces never pass raw schema objects to the DynamoDB layer. They compile into `SchemaMeta` once per `forTable` binding. Validation, projection lists, and “what belongs on this row” all read from here.
 
-**IndexRegistry** (usually owned by `SchemaMeta`) records primary, GSI, and LSI geometry: which storage fields hold keys, which logical fields form each composite, and how values join (for example `#` in single-table layouts). Query and scan code resolves `IndexName` and key inputs through the registry. The program does not auto-pick an index: the caller names it; the registry supplies storage field names and composite rules.
+**IndexRegistry** (usually owned by `SchemaMeta`) records primary, GSI, and LSI geometry: which storage fields hold keys, which logical fields form each composite, and how values join (for example `#` in single-table layouts). Query and scan code resolves `IndexName` and key inputs through the registry. The program does not auto-pick an index: the caller names it. The registry supplies storage field names and composite rules.
 
 **TypeConverterRegistry** holds built-in and custom converters (`Date`, `Set`, encrypted strings, money-as-integer). **Marshaller** walks `SchemaMeta`, applies converters, and produces document-client items and keys. It also strips stored key attributes on read so callers see the logical row shape. One marshaller path serves Put, Get, Update, Query, and Scan.
 
-**ExpressionCompiler** turns a shared expression AST into DynamoDB `ExpressionAttributeNames`, `ExpressionAttributeValues`, and expression strings. Condition, key, update, and projection builders on the public surface are DSLs only; they all compile through this module so `#n0` / `:v0` allocation and logical-to-storage name mapping stay consistent.
+**ExpressionCompiler** turns a shared expression AST into DynamoDB `ExpressionAttributeNames`, `ExpressionAttributeValues`, and expression strings. Condition, key, update, and projection builders on the public surface are DSLs only. They all compile through this module so `#n0` / `:v0` allocation and logical-to-storage name mapping stay consistent.
 
 **ExtensionPipeline** runs ordered hooks and built-ins (version checks, timestamps, UUID fill, atomic counters, user `beforePut` handlers). Extensions see a draft command input before `send` and can mutate the item or attach conditions.
 
@@ -458,7 +455,7 @@ declare function forTable<S extends SchemaWithPrimaryIndex>(
 
 ### C. API Surface (Illustrative)
 
-Sketches illustrate style only; names and signatures may change before ship. Part one: core (`defineSchema`, `forTable`, typed table operations). Part two: modular helpers as separate imports.
+Sketches illustrate style only. Names and signatures may change before ship. Part one: core (`defineSchema`, `forTable`, typed table operations). Part two: modular helpers as separate imports.
 
 **Core**
 
@@ -535,23 +532,23 @@ await transactWriteChunks(docClient, [
 
 ### D. Companion Sentiment Bundle
 
-Full JSON corpus and headline sentiment: [gist](https://gist.github.com/lucianlature-endava/98e5058ee7b549d283a505eae64e647e).
+Full JSON collection and headline sentiment: [gist](https://gist.github.com/lucianlature-endava/98e5058ee7b549d283a505eae64e647e).
 
 ### E. Schema Functions Over Decorators and Java Comparator
 
 **Schema functions over decorators**
 
-TypeScript decorators are usually the wrong default for a DynamoDB elevated client in the JS/TS SDK:
+TypeScript decorators are usually the wrong default for a DynamoDB high level client in the JS/TS SDK:
 
 - **Operational and build friction:** extra compiler settings and sometimes runtime metadata across Node versions, bundlers, and test runners.
 - **Ecosystem mismatch:** plain objects + type inference work in serverless, edge bundling, and mixed JS/TS repos.
-- **Tree-shaking and modularity:** decorators push class-based, reflective patterns; harder to keep the library small and composable.
+- **Tree-shaking and modularity:** decorators push class-based, reflective patterns. Harder to keep the library small and composable.
 - **Escape to lower layers:** additive composition with `DynamoDBDocumentClient` stays obvious with schema functions.
-- **Versioning risk:** decorator APIs are harder to evolve across early phases; functional schemas stabilize more cleanly.
+- **Versioning risk:** decorator APIs are harder to evolve across early phases. Functional schemas stabilize more cleanly.
 
 Reference: [gist.github.com/lucianlature-endava/bcecc19ce515e4c0fd428cd4c37c7b9e](https://gist.github.com/lucianlature-endava/bcecc19ce515e4c0fd428cd4c37c7b9e).
 
-**Java Enhanced Client vs proposed JS elevated client (schema mapping)**
+**Java Enhanced Client vs proposed JS high level client (schema mapping)**
 
 Binding a type to a table uses `@DynamoDbBean` in Java vs `defineSchema({ attributes, indexes })` and `forTable(tableName, schema, { client })` in JS.
 
@@ -567,13 +564,13 @@ Ignored properties use `@DynamoDbIgnore` in Java vs omitting the field from `att
 
 Optimistic locking uses `@DynamoDbVersionAttribute` in Java vs `versionAttribute: true` on a numeric attribute in JS.
 
-Dynamic per-request table names have various Java patterns; JS treats this as a Phase 5 candidate if demand is confirmed.
+Dynamic per-request table names have various Java patterns. JS treats this as a Phase 5 candidate if demand is confirmed.
 
-Schema reuse in Java uses class extension and annotations; JS uses composition of plain attribute and index fragments.
+Schema reuse in Java uses class extension and annotations. JS uses composition of plain attribute and index fragments.
 
-### F. npm Download Volume and Community-Wrapper Demand
+### F. Npm Download Volume and Community-Wrapper Demand
 
-The naïve ratio (archived Labs DataMapper against the entire aws-sdk v2 package) is misleading because v2 bundles every AWS service. Directional comparisons still help: in 2024 archived Labs DataMapper averaged ~100K downloads/month against ~41M for aws-sdk v2 (0.24%). In 2025 ~113K vs ~37M (0.31%). In March 2026 ~115K vs ~41M (0.28%).
+The naive ratio (archived Labs DataMapper against the entire aws-sdk v2 package) is misleading because v2 bundles every AWS service. Directional comparisons still help: in 2024 archived Labs DataMapper averaged ~100K downloads/month against ~41M for aws-sdk v2 (0.24%). In 2025 ~113K vs ~37M (0.31%). In March 2026 ~115K vs ~41M (0.28%).
 
 **DynamoDB-only v3 clients (closer comparison):** archived Labs DataMapper (~~115K/month) vs `@aws-sdk/client-dynamodb` (~~26M/month) and `@aws-sdk/lib-dynamodb` (~16M/month), roughly 0.44% and 0.73% respectively.
 
@@ -581,7 +578,7 @@ The naïve ratio (archived Labs DataMapper against the entire aws-sdk v2 package
 
 That total is ~~14.8% of estimated `client-dynamodb` users and ~24.3% of estimated `lib-dynamodb` users (~~one in four `lib-dynamodb` installs alongside a community higher-level wrapper).
 
-**Notes:** Archived Labs DataMapper still sees ~115K/month with no first-party v3 successor. Share of v2 rose from 0.24% (2024) to 0.31% (2025) while v2 declined. SDK team feedback: v2 Labs DataMapper users were generally satisfied. The gap is the missing **v3** successor on `@aws-sdk/`*, not lack of appetite for an elevated client.
+**Notes:** Archived Labs DataMapper still sees ~115K/month with no first-party v3 successor. Share of v2 rose from 0.24% (2024) to 0.31% (2025) while v2 declined. SDK team feedback: v2 Labs DataMapper users were generally satisfied. The gap is the missing **v3** successor on `@aws-sdk/`*, not lack of appetite for an high level client.
 
 ### G. Community Libraries vs Proposed First-Party High Level Client (Illustrative Comparison)
 
@@ -589,15 +586,15 @@ That total is ~~14.8% of estimated `client-dynamodb` users and ~24.3% of estimat
 
 **Release alignment:** the first-party package follows the same cadence as `@aws-sdk/lib-dynamodb`. Community libraries release independently.
 
-**Default AWS path in docs and training:** the elevated client can become the documented common case. Community options remain third-party in official AWS material.
+**Default AWS path in docs and training:** the high level client can become the documented common case. Community options remain third-party in official AWS material.
 
 **Primary modeling style:** schema-first with a typed table handle (proposed) vs access-pattern / single-table orientation (ElectroDB), schema definitions with Entity/Table (Toolbox), or model-centric documents (Dynamoose).
 
-**Scope (committed program):** CRUD/query, conditions, hooks, locking, and modular helpers for the proposed client; richer entity/query APIs (ElectroDB); flexible entities (Toolbox); document-layer models (Dynamoose).
+**Scope (committed program):** CRUD/query, conditions, hooks, locking, and modular helpers for the proposed client. Richer entity/query APIs (ElectroDB). Flexible entities (Toolbox). Document-layer models (Dynamoose).
 
-**Escape hatch to `DynamoDBDocumentClient`:** first-class on the same stack (proposed); supported via the AWS SDK underneath for all three community options.
+**Escape hatch to `DynamoDBDocumentClient`:** first-class on the same stack (proposed). Supported via the AWS SDK underneath for all three community options.
 
-**Opinion on single-table design:** neutral (proposed); strong opinions (ElectroDB); flexible (Toolbox and Dynamoose).
+**Opinion on single-table design:** neutral (proposed). Strong opinions (ElectroDB). Flexible (Toolbox and Dynamoose).
 
 Community libraries earned their download share. The investment case is an official, supportable default on v3, not displacing the ecosystem.
 
@@ -607,24 +604,24 @@ Community libraries earned their download share. The investment case is an offic
 
 ### I. Acquisition Alternatives (Adaptation to Document Client and @aws-sdk/*)
 
-For a hypothetical acquisition (AWS buys a library instead of greenfielding): how hard to adapt it to `@aws-sdk/client-dynamodb` + `@aws-sdk/lib-dynamodb` + `DynamoDBDocumentClient.send(...)`, then ship under `@aws-sdk/`*? Assumptions: TypeScript-first, 50/50 single-table and multi-table workloads.
+For a hypothetical acquisition (AWS buys a library instead of building new): how hard to adapt it to `@aws-sdk/client-dynamodb` + `@aws-sdk/lib-dynamodb` + `DynamoDBDocumentClient.send(...)`, then ship under `@aws-sdk/`*? Assumptions: TypeScript-first, 50/50 single-table and multi-table workloads.
 
-**I.1 Reference design (proposed first-party elevated client)**
+**I.1 Reference design (proposed first-party high level client)**
 
 - Schema values, not decorators: `defineSchema({ attributes, indexes })`.
 - Table binding: `forTable(tableName, schema, { client })`.
-- Wire path: every call is still `DynamoDBDocumentClient.send(SomeCommand)` with the same marshalling family as `@aws-sdk/lib-dynamodb`.
+- Request path: every call is still `DynamoDBDocumentClient.send(SomeCommand)` with the same marshalling family as `@aws-sdk/lib-dynamodb`.
 - Modular escape: expression builders, pagination, batch helpers compose with the same client.
 
 **I.2 Summary ranking**
 
-1. **DynamoDB-Toolbox (v2)** — strongest fit: command builder over the same AWS SDK surface; closest to Entity + schema + `.build(…Command).send()`; medium-high learning curve; technically strong as `@aws-sdk/`*.
-2. **ElectroDB** — moderate adaptation: v3 docs center `DynamoDBClient` and need a formal `DynamoDBDocumentClient` matrix; partial fit (access-pattern-first vs neutral table-per-entity); medium learning curve; moderate ship-as-`@aws-sdk/`* case.
-3. **Dynamoose** — weakest wire alignment: service-style `ddb` config vs `send(Command)` everywhere; farthest from the reference design (Mongoose-like models); low curve for Mongoose users; weakest technical ship case.
+1. **DynamoDB-Toolbox (v2):** Strongest fit. Command builder over the same AWS SDK surface, closest to Entity + schema + `.build(…Command).send()`. Medium-high learning curve. Technically strong as `@aws-sdk/*`.
+2. **ElectroDB:** Moderate adaptation. v3 docs center `DynamoDBClient` and need a formal `DynamoDBDocumentClient` matrix. Partial fit (access-pattern-first vs neutral table-per-entity). Medium learning curve. Moderate shippable as `@aws-sdk/*` case.
+3. **Dynamoose:** Weakest DynamoDB API alignment. Service-style `ddb` config vs `send(Command)` everywhere, farthest from the reference design (Mongoose-like models). Low curve for Mongoose users. Weakest technical ship case.
 
 **I.3 Mapping to reference design**
 
-**DynamoDB-Toolbox** matches Entity + Table + schema validation that emits AWS SDK commands. It diverges with richer validation/transforms than the committed program promises; single-table design is a strength, not mandatory.
+**DynamoDB-Toolbox** matches Entity + Table + schema validation that emits AWS SDK commands. It diverges with richer validation and transforms than the committed program promises. Single-table design is a strength, not mandatory.
 
 **ElectroDB** matches entity model, indexes, composite templates, and one-table binding. It diverges with access-pattern-first APIs, fluent `.patch()… .go()`, and library metadata on items (e.g. `__edb_`*).
 
@@ -632,26 +629,26 @@ For a hypothetical acquisition (AWS buys a library instead of greenfielding): ho
 
 **I.4 Deep comparison axes**
 
-- **Wire stack:** Toolbox expects the same peer packages and command-first examples. ElectroDB documents v3 with `DynamoDBClient`; acquisition needs a supported `DynamoDBDocumentClient` matrix. Dynamoose is closest to low-level client service class, not document client as primary abstraction here.
+- **API stack:** Toolbox expects the same peer packages and command-first examples. ElectroDB documents v3 with `DynamoDBClient`. Acquisition needs a supported `DynamoDBDocumentClient` matrix. Dynamoose is closest to low-level client service class, not document client as primary abstraction here.
 - **50/50 single-table vs multi-table:** ElectroDB markets single-table design. Toolbox and Dynamoose are more table-centric / neutral for multi-table teams.
 - **Learning curve:** Toolbox rewards strict TypeScript. ElectroDB adds access-pattern vocabulary. Dynamoose is gentle for Mongoose immigrants.
-- **Ship as @aws-sdk/*:** Toolbox: fewest architectural surprises when renamed and in-tree. ElectroDB: ship-able with program cost to neutralize positioning and formalize DocumentClient. Dynamoose: ship-able only with heavy engineering toward command-centric paths.
+- **Ship as @aws-sdk/*:** Toolbox: fewest architectural surprises when renamed and in-tree. ElectroDB: shippable with program cost to neutralize positioning and formalize DocumentClient. Dynamoose: shippable only with heavy engineering toward command-centric paths.
 
 **I.5 Committed capability parity and effort (qualitative)**
 
-- **Additive `DynamoDBDocumentClient` only:** large (greenfield); parity with small packaging (Toolbox); medium–large gap for DocumentClient CI (ElectroDB); large–extra-large gap (Dynamoose).
-- **Schema-first API (`defineSchema` / `forTable`):** extra-large (greenfield); parity with medium rename/subset (Toolbox); medium–large to neutralize single-table defaults (ElectroDB); medium–large reshape (Dynamoose).
-- **Primary index typed CRUD/query:** large (greenfield); parity, small–medium (Toolbox, ElectroDB, Dynamoose).
-- **GSI/LSI explicit `IndexName` query:** large–extra-large (greenfield); parity, medium (Toolbox); strong parity, small–medium (ElectroDB); parity, medium (Dynamoose).
-- **Expression / pagination / batch / locking / errors:** medium–large each (greenfield); mostly parity with small–medium gaps (Toolbox); mostly parity with medium product cost (ElectroDB); partial, medium–large (Dynamoose).
+- **Additive `DynamoDBDocumentClient` only:** large (new build). Parity with small packaging (Toolbox). Medium–large gap for DocumentClient CI (ElectroDB). Large–extra-large gap (Dynamoose).
+- **Schema-first API (`defineSchema` / `forTable`):** extra-large (new build). Parity with medium rename/subset (Toolbox). Medium–large to neutralize single-table defaults (ElectroDB). Medium–large reshape (Dynamoose).
+- **Primary index typed CRUD/query:** large (new build). Parity, small–medium (Toolbox, ElectroDB, Dynamoose).
+- **GSI/LSI explicit `IndexName` query:** large–extra-large (new build). Parity, medium (Toolbox). Strong parity, small–medium (ElectroDB). Parity, medium (Dynamoose).
+- **Expression / pagination / batch / locking / errors:** medium–large each (new build). Mostly parity with small–medium gaps (Toolbox). Mostly parity with medium product cost (ElectroDB). Partial, medium–large (Dynamoose).
 
-**Net effort (indicative):** Greenfield and adopt-Toolbox both **large–extra-large** with different work (capability vs governance/rename). Adopt ElectroDB or Dynamoose is **extra-large** if strict `DynamoDBDocumentClient.send(Command)` is mandatory everywhere.
+**Net effort (indicative):** A new build and adopt-Toolbox both **large–extra-large** with different work (capability vs governance/rename). Adopt ElectroDB or Dynamoose is **extra-large** if strict `DynamoDBDocumentClient.send(Command)` is mandatory everywhere.
 
 **I.6 Decision pull-through**
 
-Default program: **greenfield** aligned to this design (max API control, IP/release clarity, v3 tenets). Acquisition paths (e.g. Toolbox) deserve review only if leadership prioritizes time-to-first-supported-release and accepts license, renaming, API subsetting, and long-term maintenance of concepts AWS did not originate.
+Default program: **new build** aligned to this design (max API control, IP/release clarity, v3 tenets). Acquisition paths (e.g. Toolbox) deserve review only if leadership prioritizes time-to-first-supported-release and accepts license, renaming, API subsetting, and long-term maintenance of concepts AWS did not originate.
 
-### J. PoC Micro-Benchmark
+### J. Exploratory micro-benchmark
 
 Four DynamoDB access layers (raw `DynamoDBDocumentClient`, DynamoDB Toolbox, ElectroDB, Dynamoose) against one table with fixed pk/sk and shared item shape. Each stack runs in its own AWS Lambda (`CSM_aws-sdk-js-v3_StackBenchPut_{raw,toolbox,electrodb,dynamoose}`, Node.js 20.x, 4096 MB, 900s timeout), invoked sequentially.
 
@@ -675,21 +672,21 @@ For program leadership (planning, resourcing, go/no-go gates). This appendix is 
 - Phases are mostly **sequential**. Phase 2 performance CI can overlap late Phase 1.
 - **Scope contract** is Java Enhanced parity as defined by the deliverables in this appendix. Scope changes go through change board after Phase 2 exit.
 - **Preview publish:** npm `@aws-sdk/lib-dynamodb-data-mapper` on the preview channel after Phase 1 exit.
-- **GA definition:** API freeze, migration guide, perf CI gates, named AWS owner, support runbooks.
+- **GA definition:** API freeze, migration guide, performance CI gates, named AWS owner, support runbooks.
 
-**Pre-kickoff engineering:** Any code already under `lib/lib-dynamodb-data-mapper/src` is an **internal spike only**. Do not treat it as a baseline, a demo of GA scope, or evidence that any phase deliverable is done.
+**Pre-kickoff engineering:** Any code already under `lib/lib-dynamodb-data-mapper/src` is an **internal exploratory code only**. Do not treat it as a baseline, a demo of GA scope, or evidence that any phase deliverable is done.
 
 #### Phase summary
 
-- **Phase 0 — Alignment & CI,** estimated effort **5 wd.** Customer milestone: scope sign-off, repo and Local CI wired.
-- **Phase 1 — Core CRUD + primary query,** estimated effort **15 wd.** Customer milestone: installable preview on npm, primary index only.
-- **Phase 2 — Indexes, expressions, pagination,** estimated effort **22 wd.** Customer milestone: GSI/LSI query, builders, paged query.
-- **Phase 3 — Scan, batch, transact,** estimated effort **19 wd.** Customer milestone: read breadth, write batching, transactions.
-- **Phase 4 — Control plane & extensions,** estimated effort **16 wd.** Customer milestone: table lifecycle, locking, hooks, extensions.
-- **Phase 5 — Schema depth & async,** estimated effort **16 wd.** Customer milestone: nested/document path, converters, async pages, packaging decision.
-- **Phase 6 — RC: freeze, perf, migration,** estimated effort **10 wd.** Customer milestone: API freeze, perf gates, migration guide.
-- **Phase 7 — GA: ownership & support,** estimated effort **6 wd.** Customer milestone: supported GA on normal `@aws-sdk/`* cadence.
-- **Program buffer,** estimated effort **10 wd.** Review slip and release train.
+- **Phase 0: Alignment & CI,** estimated effort **5 wd.** Customer milestone: scope sign-off, repo and Local CI wired.
+- **Phase 1: Core CRUD + primary query,** estimated effort **15 wd.** Customer milestone: installable preview on npm, primary index only.
+- **Phase 2: Indexes, expressions, pagination,** estimated effort **22 wd.** Customer milestone: GSI/LSI query, builders, paged query.
+- **Phase 3: Scan, batch, transact,** estimated effort **19 wd.** Customer milestone: read breadth, write batching, transactions.
+- **Phase 4: Control plane & extensions,** estimated effort **16 wd.** Customer milestone: table lifecycle, locking, hooks, extensions.
+- **Phase 5: Schema depth & async,** estimated effort **16 wd.** Customer milestone: nested/document path, converters, async pages, packaging decision.
+- **Phase 6: RC: freeze, perf, migration,** estimated effort **10 wd.** Customer milestone: API freeze, performance gates, migration guide.
+- **Phase 7: GA: ownership & support,** estimated effort **6 wd.** Customer milestone: supported GA on normal `@aws-sdk/`* cadence.
+- **Program buffer:** estimated effort **10 wd.** Review slip and release train.
 
 **Total estimated effort to GA:** **~120 wd** (109 wd across Phases 0–7 + 10 wd program buffer).
 
@@ -698,7 +695,7 @@ For program leadership (planning, resourcing, go/no-go gates). This appendix is 
 #### Phase 0: Alignment & CI (estimated effort 5 wd)
 
 - **0.1** Deliverables ↔ phase mapping signed (this design document, committed scope, and appendix). **Effort: 3 wd.**
-- **0.2** SDK/DDB review owners, npm preview semver policy. **Effort: —**
+- **0.2** SDK/DDB review owners, npm preview semantic versioning policy. **Effort: (included)**
 - **0.3** DynamoDB Local integration in CI, publish pipeline stub. **Effort: 2 wd.**
 
 **Exit:** Phase 1 work authorized. Net-new API changes require a change-board ticket and an update to the committed deliverable list in this appendix.
@@ -711,11 +708,11 @@ For program leadership (planning, resourcing, go/no-go gates). This appendix is 
 - **1.2** Save, fetch, and delete a single record by its primary key. **Effort: 2 wd.**
 - **1.3** Change selected fields of an existing record without rewriting the whole record. **Effort: 2 wd.**
 - **1.4** List records that share the same primary key, with optional ordering and range refinement. **Effort: 2 wd.**
-- **1.5** Clear, typed error when an item does not match the declared shape. **Effort: —**
+- **1.5** Clear, typed error when an item does not match the declared shape. **Effort: (included)**
 - **1.6** DynamoDB service errors surface unchanged, so existing error handling keeps working. **Effort: 1 wd.**
 - **1.7** Automated tests against a local DynamoDB and a first installable preview build on npm. **Effort: 3 wd.**
-- **1.8** Library lives in the official AWS SDK for JavaScript repo and ships on the same release process. **Effort: —**
-- **1.9** For anything the library does not cover, the underlying `DynamoDBDocumentClient` remains available alongside, with no extra wiring (escape hatch). **Effort: —**
+- **1.8** Library lives in the official AWS SDK for JavaScript repo and ships on the same release process. **Effort: (included)**
+- **1.9** For anything the library does not cover, the underlying `DynamoDBDocumentClient` remains available alongside, with no extra wiring (escape hatch). **Effort: (included)**
 
 **Deferred to Phase 2+:** conditions on all paths, GSI, scan, batch, transact, table lifecycle, extensions.
 
@@ -726,17 +723,17 @@ For program leadership (planning, resourcing, go/no-go gates). This appendix is 
 #### Phase 2: Indexes, expressions, pagination (estimated effort 22 wd)
 
 - **2.1** Declare secondary indexes in the schema and query each by name (explicit index, no auto-routing). **Effort: 5 wd.**
-- **2.2** Express conditions (e.g. only update if status is still pending) using a typed builder, not hand-written DynamoDB strings. **Effort: 3 wd.**
-- **2.3** Express key lookup criteria (equals, greater than, between, begins-with) using a typed builder. **Effort: —**
+- **2.2** Express conditions (e.g. Only update if status is still pending) using a typed builder, not hand-written DynamoDB strings. **Effort: 3 wd.**
+- **2.3** Express key lookup criteria (equals, greater than, between, begins-with) using a typed builder. **Effort: (included)**
 - **2.4** Express update operations (set, add, remove, append to a list) using a typed builder, with an escape hatch for unusual cases. **Effort: 4 wd.**
 - **2.5** Choose exactly which fields to read back from DynamoDB (projection). **Effort: 2 wd.**
 - **2.6** Walk through large result sets in chunks, with a next-page cursor and per-page information. **Effort: 3 wd.**
-- **2.7** Common query knobs: post-fetch filtering, sort direction, strongly-consistent reads. **Effort: —**
+- **2.7** Common query knobs: post-fetch filtering, sort direction, strongly-consistent reads. **Effort: (included)**
 - **2.8** Builders automatically translate schema field names into DynamoDB expression attribute names. **Effort: 2 wd.**
-- **2.9** Mark one field as a version counter so concurrent writers cannot silently overwrite each other. **Effort: —**
-- **2.10** Bypass the version check on a specific call when the caller intentionally forces a write. **Effort: —**
+- **2.9** Mark one field as a version counter so concurrent writers cannot silently overwrite each other. **Effort: (included)**
+- **2.10** Bypass the version check on a specific call when the caller intentionally forces a write. **Effort: (included)**
 - **2.11** Expose expression builders as a separate, optional import. **Effort: 3 wd.**
-- **2.12** Performance benchmarks (save and query) on every change, compared against the bare AWS client, with thresholds that block regressions from merging. **Effort: —**
+- **2.12** Performance benchmarks (save and query) on every change, compared against the bare AWS client, with thresholds that block regressions from merging. **Effort: (included)**
 
 **Exit:** Phase 2: production-shaped reads/writes on primary + named indexes. Expression builders suitable for preview consumers.
 
@@ -747,14 +744,14 @@ For program leadership (planning, resourcing, go/no-go gates). This appendix is 
 - **3.1** Read every record in a table (full table sweep), returned with the same typed shape as a normal query. **Effort: 5 wd.**
 - **3.2** Read every record through a secondary index. **Effort: 2 wd.**
 - **3.3** Split a full table sweep across several workers, for faster large reads (parallel scan). **Effort: 3 wd.**
-- **3.4** Iterate over query and scan results page by page using standard `for await` loops instead of manual paging. **Effort: —**
-- **3.5** Fetch many records in a single call; automatic chunking to DynamoDB limits and retry of partial failures. **Effort: 3 wd.**
-- **3.6** Save or delete many records in a single call, with the same automatic chunking and retry. **Effort: —**
+- **3.4** Iterate over query and scan results page by page using standard `for await` loops instead of manual paging. **Effort: (included)**
+- **3.5** Fetch many records in a single call. Automatic chunking to DynamoDB limits and retry of partial failures. **Effort: 3 wd.**
+- **3.6** Save or delete many records in a single call, with the same automatic chunking and retry. **Effort: (included)**
 - **3.7** One call that batches across several tables at once. **Effort: 2 wd.**
-- **3.8** Per-table options (projection, strong consistency) when fetching across multiple tables. **Effort: —**
+- **3.8** Per-table options (projection, strong consistency) when fetching across multiple tables. **Effort: (included)**
 - **3.9** Read or write a group of items as a single all-or-nothing transaction, including cross-item condition checks. **Effort: 4 wd.**
-- **3.10** One call that runs a transaction spanning multiple tables. **Effort: —**
-- **3.11** Optionally publish batch and transaction code as a separate import. **Effort: —**
+- **3.10** One call that runs a transaction spanning multiple tables. **Effort: (included)**
+- **3.11** Optionally publish batch and transaction code as a separate import. **Effort: (included)**
 
 **Exit:** Phase 3: parity with Java Enhanced on data-plane batch, transact, and scan (minus control plane).
 
@@ -763,17 +760,17 @@ For program leadership (planning, resourcing, go/no-go gates). This appendix is 
 #### Phase 4: Control plane & extensions (estimated effort 16 wd)
 
 - **4.1** Create the DynamoDB table directly from the schema, and wait until it is ready to accept traffic. **Effort: 4 wd.**
-- **4.2** "Make sure this table exists" and "make sure this table is gone" helpers, safe to call repeatedly (tests and local dev). **Effort: —**
+- **4.2** "Make sure this table exists" and "make sure this table is gone" helpers, safe to call repeatedly (tests and local dev). **Effort: (included)**
 - **4.3** Delete a table and wait until the deletion is complete. **Effort: 2 wd.**
-- **4.4** Declare or add secondary indexes when creating or updating the table. **Effort: —**
+- **4.4** Declare or add secondary indexes when creating or updating the table. **Effort: (included)**
 - **4.5** Configure on-demand vs provisioned billing, server-side encryption, and change streams at table creation. **Effort: 3 wd.**
 - **4.6** Plug-in mechanism for user logic before and after every read and write, in a defined order. **Effort: 1 wd.**
-- **4.7** Hooks at specific moments (e.g. right before a save) for enrichment or validation. **Effort: 2 wd.**
-- **4.8** Built-in helpers: auto-fill ID, created-at / updated-at timestamps, atomic counter increments. **Effort: —**
-- **4.9** Save only if the record does not already exist, plus declarative rules for how updates treat missing fields. **Effort: —**
+- **4.7** Hooks at specific moments (e.g. Right before a save) for enrichment or validation. **Effort: 2 wd.**
+- **4.8** Built-in helpers: auto-fill ID, created-at / updated-at timestamps, atomic counter increments. **Effort: (included)**
+- **4.9** Save only if the record does not already exist, plus declarative rules for how updates treat missing fields. **Effort: (included)**
 - **4.10** Save and delete can optionally return the previous version of the record. **Effort: 4 wd.**
-- **4.11** Configurable rules when an update targets a field that is not yet set (Java SDK alignment). **Effort: —**
-- **4.12** Opt-in strict mode: fetching a non-existent record throws a typed error instead of returning undefined. **Effort: —**
+- **4.11** Configurable rules when an update targets a field that is not yet set (Java SDK alignment). **Effort: (included)**
+- **4.12** Opt-in strict mode: fetching a non-existent record throws a typed error instead of returning undefined. **Effort: (included)**
 
 **Exit:** Phase 4: table bootstrap for dev/test/samples and cross-cutting write extensions documented. Production table management remains IaC-first.
 
@@ -783,26 +780,26 @@ For program leadership (planning, resourcing, go/no-go gates). This appendix is 
 
 - **5.1** Custom rules for storing and loading individual fields (encrypted strings, custom date formats, money as integers). **Effort: 4 wd.**
 - **5.2** Describe records with nested objects (user with address, order with line items) directly in the schema. **Effort: 3 wd.**
-- **5.3** First-class support for DynamoDB set, map, and list field types in the schema. **Effort: —**
+- **5.3** First-class support for DynamoDB set, map, and list field types in the schema. **Effort: (included)**
 - **5.4** Build large schemas by combining smaller reusable schema pieces. **Effort: 3 wd.**
-- **5.5** One-line opt-in for auto-generated primary keys, plus a hook for a custom ID generator. **Effort: —**
-- **5.6** Works cleanly with immutable data styles without forcing mutable patterns. **Effort: —**
+- **5.5** One-line opt-in for auto-generated primary keys, plus a hook for a custom ID generator. **Effort: (included)**
+- **5.6** Works cleanly with immutable data styles without forcing mutable patterns. **Effort: (included)**
 - **5.7** Environment prefix on every table name (dev-, staging-, sandbox-) so application code does not hard-code environment. **Effort: 3 wd.**
-- **5.8** Streaming-style results for query and scan for users who prefer a publisher API over iteration. **Effort: —**
+- **5.8** Streaming-style results for query and scan for users who prefer a publisher API over iteration. **Effort: (included)**
 - **5.9** Resolve the table name at runtime (per-tenant table) if demand is confirmed during review. **Effort: 3 wd.**
-- **5.10** Finalise packaging: separate npm packages, stable subpath exports under one umbrella, or both. **Effort: —**
+- **5.10** Finalize packaging: separate npm packages, stable subpath exports under one umbrella, or both. **Effort: (included)**
 
-**Exit:** Phase 5: schema feature set complete (nested attributes, document schema path, converters, sets/maps/lists, async pages, subpath packaging). Async path dogfoodable.
+**Exit:** Phase 5: schema feature set complete (nested attributes, document schema path, converters, sets/maps/lists, async pages, subpath packaging). Async path ready for internal trial.
 
 ---
 
 #### Phase 6: RC (estimated effort 10 wd)
 
-- **6.1** API freeze, semver policy for 1.x. **Effort: 4 wd.**
+- **6.1** API freeze, semantic versioning policy for 1.x. **Effort: 4 wd.**
 - **6.2** Migration guide (Labs DataMapper, Toolbox, raw document client). **Effort: 3 wd.**
-- **6.3** Error taxonomy frozen (high level client vs service). **Effort: —**
-- **6.4** Perf CI gates enforced on PR. **Effort: 3 wd.**
-- **6.5** Public docs and samples aligned to this appendix and committed scope. **Effort: —**
+- **6.3** Error taxonomy frozen (high level client vs service). **Effort: (included)**
+- **6.4** Performance CI gates enforced on PR. **Effort: 3 wd.**
+- **6.5** Public docs and samples aligned to this appendix and committed scope. **Effort: (included)**
 
 **Exit:** Release candidate tagged. No breaking changes without major-bump policy.
 
@@ -834,46 +831,211 @@ Calendar dates are out of scope for this appendix.
 Use as the program checklist. Detail lives in the phase sections above.
 
 - **Phase 1:** Primary CRUD + query + preview publish on npm.
-- **Phase 2:** GSI/LSI query + condition/key/update/projection builders + pagination + version locking + perf CI.
+- **Phase 2:** GSI/LSI query + condition/key/update/projection builders + pagination + version locking + performance CI.
 - **Phase 3:** Scan + parallel scan + batch + transact (+ multi-table helpers).
 - **Phase 4:** Table lifecycle + extensions/hooks + return values + update modes.
 - **Phase 5:** Converters + nested/document schema + async pages + packaging.
-- **Phase 6 (RC):** Freeze + migration + docs + perf gates.
+- **Phase 6 (RC):** Freeze + migration + docs + performance gates.
 - **Phase 7 (GA):** Ownership + supported release + program buffer.
 
 #### Surface vs phase (summary)
 
-- **Core** (`defineSchema`, `forTable`, primary CRUD/query): required in Phase 1; hardening in Phase 2; API freeze at RC/GA.
-- **Expression / condition / update / projection builders:** Phase 2 required; hardening in Phase 3; stable for GA.
-- **Pagination helpers:** Phase 2 required; frozen at RC/GA.
-- **Explicit GSI/LSI typed query:** Phase 2 required; stable for GA.
-- **Scan + parallel scan:** Phase 3 required; frozen at RC/GA.
-- **Batch / transact utilities:** Phase 3 required; frozen at RC/GA.
-- **Table lifecycle** (create/ensure/delete): Phase 4; frozen at GA.
-- **Extensions** (version, counter, UUID, timestamps, hooks): version in Phase 2; hooks in Phase 4; frozen at GA.
-- **Error taxonomy** (high level client vs service): draft in Phase 1; written spec in Phase 2; release-blocking at GA.
+- **Core** (`defineSchema`, `forTable`, primary CRUD/query): required in Phase 1. Hardening in Phase 2. API freeze at RC/GA.
+- **Expression / condition / update / projection builders:** Phase 2 required. Hardening in Phase 3. Stable for GA.
+- **Pagination helpers:** Phase 2 required. Frozen at RC/GA.
+- **Explicit GSI/LSI typed query:** Phase 2 required. Stable for GA.
+- **Scan + parallel scan:** Phase 3 required. Frozen at RC/GA.
+- **Batch / transact utilities:** Phase 3 required. Frozen at RC/GA.
+- **Table lifecycle** (create/ensure/delete): Phase 4. Frozen at GA.
+- **Extensions** (version, counter, UUID, timestamps, hooks): version in Phase 2. Hooks in Phase 4. Frozen at GA.
+- **Error taxonomy** (high level client vs service): draft in Phase 1. Written spec in Phase 2. Release-blocking at GA.
 
 #### Risks that move the GA effort total
 
 - **Scope creep** (full Java parity plus all schema features pulled into Phase 2): **+20–30 wd** on the GA total.
 - **AWS merge / review latency:** **+10–20 wd** (program buffer partly covers).
-- **Smithy / codegen churn:** rework concentrated in Phases 2–3.
-- **Pre-GA API churn without semver discipline:** adopter cost, may force **+5 wd** in RC.
+- **Smithy / code generation churn:** rework concentrated in Phases 2–3.
+- **Pre-GA API change churn without semantic versioning discipline:** early adopter cost, may force **+5 wd** in RC.
 
 #### Risk register (execution)
 
-- **Smithy / codegen or middleware churn** breaks high level client assumptions — likelihood medium, impact high — mitigate with early spike and pinning to release-train branches with JS SDK owners.
-- **AWS merge policy or repo visibility** delays integration — likelihood medium, impact medium — pre-agree branch/PR policy and ship small mergeable increments.
-- **GSI/LSI or expression-builder scope creep** delays GA — likelihood high, impact medium — treat the committed deliverable list as contract; change board after Phase 2 exit.
-- **Pre-GA API churn** burns early adopters — likelihood medium, impact high — strict semver on npm preview channels and clear deprecation notes.
+- **Smithy / codegen or middleware churn** breaks high level client assumptions (likelihood medium, impact high). Mitigate with early exploratory work and pinning to release-train branches with JS SDK owners.
+- **AWS merge policy or repo visibility** delays integration (likelihood medium, impact medium). Pre-agree branch/PR policy and ship small mergeable increments.
+- **GSI/LSI or expression-builder scope creep** delays GA (likelihood high, impact medium). Treat the committed deliverable list as contract. Change board after Phase 2 exit.
+- **Pre-GA API change churn** burns early adopters (likelihood medium, impact high). Use strict semantic versioning on npm preview channels and clear deprecation notes.
 
 ### L. Template Sections Omitted from Impact
 
-- **GT (Global Tables):** elevated client does not manage replication; use existing APIs.
-- **Keyspaces:** different product; no CQL surface.
+- **GT (Global Tables):** high level client does not manage replication. Use existing APIs.
+- **Keyspaces:** different product. No CQL surface.
 - **Elastic views:** no integration.
-- **Region Build Automation:** internal AWS process; no customer API.
+- **Region Build Automation:** internal AWS process. No customer API.
 
-### M. PoC Code in Repo
+### M. Exploratory code in repo
 
-Code under `lib/lib-dynamodb-data-mapper/src` is an internal spike only. Do not use it to infer delivery status, API freeze, or benchmark claims.
+Code under `lib/lib-dynamodb-data-mapper/src` is an internal exploratory code only. Do not use it to infer delivery status, API freeze, or benchmark claims.
+
+### N. Caller-facing API shapes: methodology and conclusions
+
+This appendix captures how we compared two **hypothetical** caller-facing shapes for the **same** committed deliverables in [Appendix K](#k-program-plan-product-engineering). It is review material for design decisions, not a second product commitment.
+
+#### Purpose
+
+Both shapes would call the same DynamoDB APIs in DynamoDB requests through `DynamoDBDocumentClient`. They differ in what application code looks like: how keys and indexes are declared, who names an index on query, whether rows are plain data or model instances with `save()`, and how painful refactors are when access patterns change. The goal is to show that **capabilities are fixed by the program** while **API style can still be chosen or deferred**.
+
+#### Methodology
+
+The comparison is organized **one row per committed deliverable**, grouped by capability (platform, schema, single-item ops, reads, batch, transactions, control plane, expressions, locking, errors). Each row has two illustrative columns:
+
+- **Schema-first shape** (this design’s default examples: `defineSchema`, `forTable`, explicit `IndexName` on query). Aligned to [Appendix K](#k-program-plan-product-engineering) phases.
+- **Document-oriented shape** (hypothetical Mongoose-like examples: `Schema` + `model()`, attribute flags for keys, library may infer the index). **Not scheduled.** No implementation in this repo.
+
+Phase labels in the source analysis map to engineering phases in Appendix K (for example Phase 1 for primary CRUD and query, Phase 2 for indexes and expressions). Rows marked as optional or off-roadmap (PartiQL, DAX inside the package, decorator-only schemas) are omitted from both columns.
+
+Snippets are **illustrative API shape only**, not frozen names or full programs. Imports are omitted for readability. For both columns, the underlying client is the same configured `DynamoDBDocumentClient`.
+
+#### What differs in practice (observable in code)
+
+Partition and sort keys on the **schema-first** shape are declared under `indexes.primary` with visible `field` and `composite` lists. On the **document-oriented** shape they are usually per-attribute flags (`hashKey`, `rangeKey`).
+
+Writes on the schema-first shape look like `table.put(row)` and `table.update(key).set({ field }).execute()`. On the document-oriented shape they often look like `Model.create(item)` or mutating a document and calling `save()`, where dirty tracking decides what gets sent.
+
+On the schema-first shape the caller **names** the index on every query. On the document-oriented shape the library can **infer** `IndexName` from the attribute being queried (automatic GSI routing), which this program explicitly excludes from GA scope.
+
+For an order with line items in a single-table design, the schema-first shape typically uses **two explicit row schemas** and two table handles, with the repository assembling `META` and `ITEM#n` rows. The document-oriented shape can expose one nested aggregate. The library chooses whether items live in an `L` attribute, as separate rows, or both, and may use a single `create()` that hides transactional layout.
+
+Validation on both paths happens before the SDK call. Error types differ in naming (`MapperValidationError` vs `ValidationError` / `CastError`) but the split between library validation and service errors is the same idea.
+
+Ecosystem parallels called out in the analysis: schema-first is closer to a repository or DAO plus JDBC-shaped APIs. Document-oriented is closer to Mongoose or Active Record.
+
+#### Conclusions
+
+**Same deliverables, different surfaces.** Appendix K is the contract for *what* ships and when. The program does **not** lock a single caller-facing DSL at design review. The same engine work (see [Appendix A](#a-architecture-illustrative)) can sit behind more than one front end if leadership funds another surface later.
+
+**Roughly eighty percent shared, twenty percent surface-specific.** Marshaling, expression compilation, pagination, batch chunking, transactions, extensions, and error mapping are identical in DynamoDB requests. What diverges is schema definition style, whether domain objects have methods, dirty tracking as default, who owns aggregate-to-row layout, visible vs hidden key composition, and hook design.
+
+```mermaid
+flowchart TD
+  subgraph Surfaces["Illustrative public surfaces"]
+    direction LR
+    SF["Schema-first high level client"]
+    DO["Document-oriented shape hypothetical"]
+  end
+  Core["Shared internal engine see Appendix A"]
+  Doc["DynamoDBDocumentClient"]
+  DDB[(DynamoDB)]
+
+  SF --> Core
+  DO --> Core
+  Core --> Doc --> DDB
+```
+
+**Default for this program:** schema-first shape. Keys, indexes, and single-table layout stay visible in application code. That supports access-pattern discipline and matches the worked example recommendation for orders with line items: more code per write, but the on-disk shape does not drift silently when requirements change.
+
+**Document-oriented shape is optional and out of scope for GA.** A separate package (hypothetically something like `@aws-sdk/lib-dynamodb-odm`) would be post-GA only if customer demand and funding justify a second program. First-class dirty tracking by default belongs in that optional bucket, not in the GA contract.
+
+**Shared core strategy** (aligned with Appendix A): build the engine as `@internal` modules under `src/core/*` behind small interfaces. Do not extract a public `mapper-core` package at GA. If a second surface is funded later, extraction becomes mechanical because both surfaces depend on interfaces, not concrete classes.
+
+**Java precedent:** `dynamodb-enhanced` uses one `TableSchema<T>` with `BeanTableSchema`, `StaticTableSchema`, and `DocumentTableSchema` as alternate front ends over the same engine. TypeScript can follow the same pattern with one `SchemaMeta` and multiple DSLs that compile into it.
+
+#### Worked example: `Order` with `OrderItem[]`
+
+Same domain, same DynamoDB outcome: single-table layout with `PK = ORDER#<id>` and `SK = META | ITEM#n`. The snippets below show how caller code diverges while the DynamoDB result stays the same.
+
+##### Schema-first shape (illustrative)
+
+Two explicit row schemas, one table handle each. The repository orchestrates writes and reads.
+
+```typescript
+const OrderMeta = defineSchema({
+  attributes: {
+    orderId:    { type: "string" },
+    customerId: { type: "string" },
+    total:      { type: "number" },
+    status:     { type: "string" },
+  },
+  indexes: {
+    primary: {
+      pk: { field: "pk", composite: ["orderId"] as const },
+      sk: { field: "sk", composite: [] as const, constant: "META" },
+    },
+  },
+});
+
+const OrderItem = defineSchema({
+  attributes: {
+    orderId:    { type: "string" },
+    lineNumber: { type: "number" },
+    sku:        { type: "string" },
+    qty:        { type: "number" },
+  },
+  indexes: {
+    primary: {
+      pk: { field: "pk", composite: ["orderId"] as const },
+      sk: { field: "sk", composite: ["lineNumber"] as const, prefix: "ITEM#" },
+    },
+  },
+});
+
+const Meta  = forTable("app", OrderMeta,  { client: db });
+const Items = forTable("app", OrderItem, { client: db });
+
+async function saveOrder(o: Order) {
+  await transactWrite([
+    Meta.put({ orderId: o.id, customerId: o.customerId, total: o.total, status: "NEW" }),
+    ...o.items.map((i) =>
+      Items.put({ orderId: o.id, lineNumber: i.line, sku: i.sku, qty: i.qty })
+    ),
+  ]).execute();
+}
+
+async function getOrder(orderId: string): Promise<Order | undefined> {
+  const rows = await Meta.query("primary", { orderId }).execute(); // META + ITEM#n
+  if (rows.length === 0) return undefined;
+  return assembleOrderFromRows(rows);
+}
+```
+
+What is visible in code: PK/SK composition, two row types, and a transactional write that spans both handles.
+
+##### Document-oriented shape (hypothetical)
+
+One model with a nested aggregate. The library hides composite keys and how items are stored.
+
+```typescript
+const orderSchema = new Schema({
+  orderId:    { type: String, hashKey: true },
+  customerId: String,
+  total:      Number,
+  status:     String,
+  items: {
+    type: Array,
+    schema: [{
+      lineNumber: Number,
+      sku:        String,
+      qty:        Number,
+    }],
+  },
+}, { timestamps: true });
+
+const Order = odm.model("Order", orderSchema, { tableName: "app" });
+
+async function saveOrder(o: Order) {
+  await Order.create(o); // or new Order(o).save();
+  // library owns whether items are nested L, separate ITEM#n rows, or both
+}
+
+async function getOrder(orderId: string) {
+  return Order.get({ orderId });
+}
+```
+
+What is hidden: how `items` is laid out on disk, the transactional shape, and key composition.
+
+##### Trade-off and recommendation
+
+The document-oriented shape is more compact for aggregate-as-document writes, but the library, not the caller, chooses the on-disk layout, so design can drift away from access-pattern discipline. The schema-first shape exposes layout: more code per write, but single-table structure stays reviewable when requirements change. This design recommends the schema-first shape as the default product direction for that reason. A document-oriented package remains an optional, separately funded add-on if leadership approves it after GA.
+
+#### Status
+
+Illustrative names and builder shapes may change until the Phase 6 API freeze. If anything in this appendix contradicts [Appendix K](#k-program-plan-product-engineering), treat Appendix K as authoritative and this appendix as the analysis record. The document-oriented column has no implementation. Code under `lib/lib-dynamodb-data-mapper/src` must not be read as evidence for either column.
