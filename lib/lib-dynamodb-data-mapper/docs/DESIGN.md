@@ -92,7 +92,7 @@ This program lives entirely on the customer side of the DynamoDB data plane. It 
 
 ## Important Design Decisions and Tradeoffs
 
-The program ships as its own package beside `@aws-sdk/lib-dynamodb`, not folded into it. That trades an extra package to own and document for room to iterate in preview phases and for teams to adopt or roll back without touching every document-client consumer. We considered folding mapping into `lib-dynamodb`, pushing it into generated clients, or reviving Labs code unchanged. A sibling package keeps the boundary clear.
+The high level client ships as `@aws-sdk/lib-dynamodb-data-mapper`, a **sibling** to `@aws-sdk/lib-dynamodb`, but not merged into `lib-dynamodb`, not embedded in generated service clients, and not an unchanged port of Labs DataMapper. The extra package is deliberate: preview APIs can evolve without dragging along every document-client consumer, and teams can adopt or remove the mapper per application.
 
 Modeling starts with an explicit schema: a small upfront definition buys consistent types and safer upgrades, while teams that want full control can still call the document client directly. The exact caller-facing shape stays open until RC. Delivery is a core high level client plus helpers that teams can take in steps (expression, pagination, batch, and locking utilities first where that is enough), then the full client when it has proved its value. Preview feedback points toward neutral modeling with AWS-owned helpers rather than a mandated style.
 
@@ -750,7 +750,7 @@ Layer 1 is required for a credible Phase 1 preview. Layer 2 aligns with expressi
 
 **Deferred to Phase 2+:** conditions on all paths, typed nested paths in expression builders, custom converters, GSI, scan, batch, transact, table lifecycle, extensions.
 
-**Exit:** Dogfoodable Phase 1: base-table CRUD + query on the npm preview channel, with marshaller baseline (built-in converters + document/map/list pass-through).
+**Exit** Phase 1: base-table CRUD + query on the npm preview channel, with marshaller baseline (built-in converters + document/map/list pass-through).
 
 ---
 
