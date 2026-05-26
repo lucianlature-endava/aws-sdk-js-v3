@@ -36,7 +36,7 @@ Java and .NET already ship first-party enhanced clients. Labs DataMapper proved 
 
 ## Tenets
 
-Teams already trust the document client for credentials, IAM, and the path to DynamoDB. This program adds an optional layer on that same stack (`@aws-sdk/lib-dynamodb` → `DynamoDBDocumentClient` → generated client), so the foundation does not change when a service opts in. Adoption stays reversible: pin the package or stop importing it, and existing call sites keep working.
+The mapper is a new package on the runtime customers already use: one additive npm artifact in the AWS SDK for JavaScript v3 line (`@aws-sdk/lib-dynamodb-data-mapper`), implemented on `@aws-sdk/lib-dynamodb` and `DynamoDBDocumentClient`, layered on the same generated clients. **Opt-in adoption leaves existing call sites unchanged**, so only code that imports the mapper uses it, every other `DynamoDBDocumentClient.send(...)` path in the application stays as written. Teams can add or drop the dependency per application without rewriting unrelated services.
 
 Modeling stays in plain TypeScript: `defineSchema({ attributes, indexes })` with inference, without decorator requirements, so serverless bundles and mixed JS/TS repos can adopt without extra compiler ceremony. [Appendix E](#e-schema-functions-over-decorators-and-java-comparator) explains the Java comparator and why that choice fits this ecosystem.
 
